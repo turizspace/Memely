@@ -1,0 +1,423 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:2:1-39:12
+INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:2:1-39:12
+INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:2:1-39:12
+INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:2:1-39:12
+MERGED from [com.google.accompanist:accompanist-systemuicontroller:0.32.0] /home/turizspace/.gradle/caches/transforms-3/ca66da7ae7f4e0058b90124b9c5658c3/transformed/accompanist-systemuicontroller-0.32.0/AndroidManifest.xml:17:1-23:12
+MERGED from [com.google.accompanist:accompanist-flowlayout:0.32.0] /home/turizspace/.gradle/caches/transforms-3/a9ed6f4cdb58e8369b379c47d304fd60/transformed/accompanist-flowlayout-0.32.0/AndroidManifest.xml:17:1-23:12
+MERGED from [io.coil-kt:coil-compose:2.4.0] /home/turizspace/.gradle/caches/transforms-3/6715d8dbddbfa0f3789d3d9a96a2d90f/transformed/coil-compose-2.4.0/AndroidManifest.xml:2:1-7:12
+MERGED from [io.coil-kt:coil-compose-base:2.4.0] /home/turizspace/.gradle/caches/transforms-3/0e281ef82eb451f56b20b1425d8805e4/transformed/coil-compose-base-2.4.0/AndroidManifest.xml:2:1-7:12
+MERGED from [io.coil-kt:coil:2.4.0] /home/turizspace/.gradle/caches/transforms-3/dd31f39318ad407ea5956083d3bdd728/transformed/coil-2.4.0/AndroidManifest.xml:2:1-7:12
+MERGED from [io.coil-kt:coil-base:2.4.0] /home/turizspace/.gradle/caches/transforms-3/05edac2cf6fb9f514a09bbe264a4e510/transformed/coil-base-2.4.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/turizspace/.gradle/caches/transforms-3/a10a19056fdb5fd9d349329dcf31b4bc/transformed/appcompat-resources-1.6.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/turizspace/.gradle/caches/transforms-3/a7bb92b2b627f24feacdb17b4f7193ea/transformed/appcompat-1.6.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.navigation:navigation-common:2.7.4] /home/turizspace/.gradle/caches/transforms-3/b414d187fee28f53751d83743f33a754/transformed/navigation-common-2.7.4/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.navigation:navigation-runtime:2.7.4] /home/turizspace/.gradle/caches/transforms-3/2f8de3a39aee87a45e2ddfb6e4a96897/transformed/navigation-runtime-2.7.4/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.navigation:navigation-common-ktx:2.7.4] /home/turizspace/.gradle/caches/transforms-3/5bf29808a12bcbba915514923b54df92/transformed/navigation-common-ktx-2.7.4/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.navigation:navigation-runtime-ktx:2.7.4] /home/turizspace/.gradle/caches/transforms-3/a367daf72e6646501ebcb73eee360312/transformed/navigation-runtime-ktx-2.7.4/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.navigation:navigation-compose:2.7.4] /home/turizspace/.gradle/caches/transforms-3/38ae5c57db6457a8e2f94ad848b3b8d4/transformed/navigation-compose-2.7.4/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.fragment:fragment:1.3.6] /home/turizspace/.gradle/caches/transforms-3/ecbfaf0e2bab4937ecb1dfadf5ffd9fa/transformed/fragment-1.3.6/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.compose.material:material-ripple-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/58033b743f8e387b9c90ed54551dd774/transformed/material-ripple-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.material:material-icons-core-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/20cb0b2d2742456ce1b3181be1213c94/transformed/material-icons-core-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.material:material-icons-extended-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/b7e171a5ac55b62d0ff293acba5ee48d/transformed/material-icons-extended-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/435bddb81f65e994b15a0a0b85f75a62/transformed/foundation-layout-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.foundation:foundation-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8aa8ea612323e92623b359bc9938cd46/transformed/foundation-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.animation:animation-core-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/a4765ef618a59c64f87e4ceec8e429b8/transformed/animation-core-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.animation:animation-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/7564b827742308b3751a383d6e0c9bc4/transformed/animation-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-tooling-data-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/c9add33b771031eaed10dc6768f3e68e/transformed/ui-tooling-data-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-unit-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/cd56d3ad23560765a83557124e517de5/transformed/ui-unit-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-geometry-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/398accc779e7bf3e984f683797ec5b59/transformed/ui-geometry-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-text-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/80788f59fbf2e1217c2eceee7a0e41b9/transformed/ui-text-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-util-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8c79e50366da0c399cf1f55b4eda9a35/transformed/ui-util-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/07516b0118f69e2a61ade0646b3ae14b/transformed/ui-tooling-preview-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.ui:ui-graphics-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/f260e03c4629cf272477d69f232f4a60/transformed/ui-graphics-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-tooling-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8d60d19496bd79fa4d2b3b25d1f2de80/transformed/ui-tooling-release/AndroidManifest.xml:17:1-28:12
+MERGED from [androidx.compose.material:material-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/c0183c9b7190764eb2c2c5ce098eb967/transformed/material-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.loader:loader:1.0.0] /home/turizspace/.gradle/caches/transforms-3/e46cdc0fed77ff1cec947f9b4fd2e074/transformed/loader-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.emoji2:emoji2-views-helper:1.4.0] /home/turizspace/.gradle/caches/transforms-3/a96bbccc325660f9ad6e079adfae64b7/transformed/emoji2-views-helper-1.4.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /home/turizspace/.gradle/caches/transforms-3/cb1b2ecb2d43b098820570dcb7604f76/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.6.2] /home/turizspace/.gradle/caches/transforms-3/8de2ecc87a43aaac5ad01aa5894bf889/transformed/lifecycle-livedata-2.6.2/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.2] /home/turizspace/.gradle/caches/transforms-3/806f3c1d8d4fe3286fb5e294adebe7ab/transformed/lifecycle-viewmodel-savedstate-2.6.2/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.6.2] /home/turizspace/.gradle/caches/transforms-3/2417669d8190e469c1219be5d4c4fe9b/transformed/lifecycle-livedata-core-2.6.2/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2] /home/turizspace/.gradle/caches/transforms-3/54150a203bf28c5acf77fda5577be12f/transformed/lifecycle-viewmodel-ktx-2.6.2/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /home/turizspace/.gradle/caches/transforms-3/108d276c961f871fbeda7a80508b1dc6/transformed/savedstate-ktx-1.2.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.savedstate:savedstate:1.2.1] /home/turizspace/.gradle/caches/transforms-3/78fec73fcd6c8a5db4b841e3bf6f2d17/transformed/savedstate-1.2.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.6.2] /home/turizspace/.gradle/caches/transforms-3/2ff18f0bef7dc5c3034d8b80f2bf4686/transformed/lifecycle-viewmodel-2.6.2/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2] /home/turizspace/.gradle/caches/transforms-3/ad32b08631d957cea88c357d926c5dcd/transformed/lifecycle-viewmodel-compose-2.6.2/AndroidManifest.xml:17:1-22:12
+MERGED from [com.google.accompanist:accompanist-drawablepainter:0.30.1] /home/turizspace/.gradle/caches/transforms-3/ecb8dd562793942d06ed2215cdb6ec25/transformed/accompanist-drawablepainter-0.30.1/AndroidManifest.xml:17:1-25:12
+MERGED from [androidx.compose.ui:ui-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/905d0d54bd60df2a3399fd7a7eed846f/transformed/ui-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-test-manifest:1.5.3] /home/turizspace/.gradle/caches/transforms-3/4a3e82bf98f43e74de6b703cabee9b4c/transformed/ui-test-manifest-1.5.3/AndroidManifest.xml:17:1-28:12
+MERGED from [androidx.activity:activity:1.8.0] /home/turizspace/.gradle/caches/transforms-3/fafd624207921c7547ede25074e61d74/transformed/activity-1.8.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.activity:activity-compose:1.8.0] /home/turizspace/.gradle/caches/transforms-3/2a5274b4c9a018083e73db882c0f450f/transformed/activity-compose-1.8.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.activity:activity-ktx:1.8.0] /home/turizspace/.gradle/caches/transforms-3/e26433de1363886cdfeec8d4a4dab386/transformed/activity-ktx-1.8.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /home/turizspace/.gradle/caches/transforms-3/34410db398728ef6a670605e11e5ff22/transformed/customview-poolingcontainer-1.0.0/AndroidManifest.xml:17:1-23:12
+MERGED from [androidx.core:core-ktx:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0d80b548ffd64a28b07f639bc58b6b0f/transformed/core-ktx-1.12.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/turizspace/.gradle/caches/transforms-3/f10d429f47cbd40c23f706c475d9d18b/transformed/drawerlayout-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/turizspace/.gradle/caches/transforms-3/f1ad0a278c284f8907faaba2af5425a6/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/turizspace/.gradle/caches/transforms-3/5df2d834be23d908dd25f92ec0a4a02c/transformed/vectordrawable-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/turizspace/.gradle/caches/transforms-3/5c1863c27639e6ae415394bbe81b2132/transformed/viewpager-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.customview:customview:1.0.0] /home/turizspace/.gradle/caches/transforms-3/8c9e6069cde1664df9510007524577cc/transformed/customview-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.autofill:autofill:1.0.0] /home/turizspace/.gradle/caches/transforms-3/d101d7b953d2d47fe1c7c6295921a126/transformed/autofill-1.0.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:17:1-30:12
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.6.2] /home/turizspace/.gradle/caches/transforms-3/bcd200311dbaaadf9b6834912e85e0e1/transformed/lifecycle-runtime-2.6.2/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx:2.6.2] /home/turizspace/.gradle/caches/transforms-3/4bce5fb00c94a47bf05656af2a0d45f0/transformed/lifecycle-runtime-ktx-2.6.2/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/78282d104aad4cb8ace3de70e0334cef/transformed/runtime-saveable-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.runtime:runtime-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/fa9aed84fbb9445e7b65dc379b5c0a80/transformed/runtime-release/AndroidManifest.xml:2:1-7:12
+MERGED from [fr.acinq.secp256k1:secp256k1-kmp-jni-android:0.10.1] /home/turizspace/.gradle/caches/transforms-3/9492ca1a16c9128b1e7449a935b7e333/transformed/secp256k1-kmp-jni-android-0.10.1/AndroidManifest.xml:2:1-9:12
+MERGED from [androidx.security:security-crypto:1.1.0-alpha06] /home/turizspace/.gradle/caches/transforms-3/163d8a654da55f377a8d7b6dd7719e6a/transformed/security-crypto-1.1.0-alpha06/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] /home/turizspace/.gradle/caches/transforms-3/729213448632baf3e9c2e8e4bb5aa0f7/transformed/annotation-experimental-1.3.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/turizspace/.gradle/caches/transforms-3/cccdda48b9bc8fca34f144b0acd6c9fc/transformed/cursoradapter-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/turizspace/.gradle/caches/transforms-3/1297a3707d58c4bf4bdb20d15c45a60e/transformed/interpolator-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/turizspace/.gradle/caches/transforms-3/6b6d82e2c44f419a5bf62276b91b3948/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:17:1-27:12
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /home/turizspace/.gradle/caches/transforms-3/773b2f550b00256d8508c075cba0a654/transformed/core-runtime-2.2.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:17:1-55:12
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/turizspace/.gradle/caches/transforms-3/e2580e4aeeaec6047bdd69f5e6a515e1/transformed/startup-runtime-1.1.1/AndroidManifest.xml:17:1-33:12
+MERGED from [androidx.tracing:tracing:1.0.0] /home/turizspace/.gradle/caches/transforms-3/364f2645da04da70b2f0e046170e3b43/transformed/tracing-1.0.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.exifinterface:exifinterface:1.3.6] /home/turizspace/.gradle/caches/transforms-3/9add46c64d9e24d44c34f6963e784b0a/transformed/exifinterface-1.3.6/AndroidManifest.xml:17:1-24:12
+	package
+		INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml
+	android:versionName
+		INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml
+	android:versionCode
+		INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:2:11-69
+uses-permission#android.permission.INTERNET
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:4:5-67
+	android:name
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:4:22-64
+uses-permission#android.permission.WRITE_EXTERNAL_STORAGE
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:5:5-81
+	android:name
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:5:22-78
+uses-permission#android.permission.READ_EXTERNAL_STORAGE
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:6:5-80
+	android:name
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:6:22-77
+application
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:9:5-37:19
+INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:9:5-37:19
+MERGED from [androidx.compose.ui:ui-tooling-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8d60d19496bd79fa4d2b3b25d1f2de80/transformed/ui-tooling-release/AndroidManifest.xml:22:5-26:19
+MERGED from [androidx.compose.ui:ui-tooling-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8d60d19496bd79fa4d2b3b25d1f2de80/transformed/ui-tooling-release/AndroidManifest.xml:22:5-26:19
+MERGED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /home/turizspace/.gradle/caches/transforms-3/cb1b2ecb2d43b098820570dcb7604f76/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /home/turizspace/.gradle/caches/transforms-3/cb1b2ecb2d43b098820570dcb7604f76/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.compose.ui:ui-test-manifest:1.5.3] /home/turizspace/.gradle/caches/transforms-3/4a3e82bf98f43e74de6b703cabee9b4c/transformed/ui-test-manifest-1.5.3/AndroidManifest.xml:22:5-26:19
+MERGED from [androidx.compose.ui:ui-test-manifest:1.5.3] /home/turizspace/.gradle/caches/transforms-3/4a3e82bf98f43e74de6b703cabee9b4c/transformed/ui-test-manifest-1.5.3/AndroidManifest.xml:22:5-26:19
+MERGED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:28:5-89
+MERGED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:28:5-89
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/turizspace/.gradle/caches/transforms-3/6b6d82e2c44f419a5bf62276b91b3948/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/turizspace/.gradle/caches/transforms-3/6b6d82e2c44f419a5bf62276b91b3948/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:23:5-53:19
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:23:5-53:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/turizspace/.gradle/caches/transforms-3/e2580e4aeeaec6047bdd69f5e6a515e1/transformed/startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/turizspace/.gradle/caches/transforms-3/e2580e4aeeaec6047bdd69f5e6a515e1/transformed/startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+	android:extractNativeLibs
+		INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml
+	android:appComponentFactory
+		ADDED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:28:18-86
+	android:label
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:12:9-31
+	android:icon
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:13:9-43
+	android:allowBackup
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:11:9-35
+	android:theme
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:14:9-56
+	android:name
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:10:9-34
+activity#com.memely.ui.MainActivity
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:16:9-35:20
+	android:launchMode
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:19:13-43
+	android:exported
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:18:13-36
+	android:name
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:17:13-54
+intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:22:13-25:29
+action#android.intent.action.MAIN
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:23:17-69
+	android:name
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:23:25-66
+category#android.intent.category.LAUNCHER
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:24:17-77
+	android:name
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:24:27-74
+intent-filter#action:name:android.intent.action.VIEW+category:name:android.intent.category.BROWSABLE+category:name:android.intent.category.DEFAULT+data:scheme:nostrsigner
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:28:13-33:29
+action#android.intent.action.VIEW
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:29:17-69
+	android:name
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:29:25-66
+category#android.intent.category.DEFAULT
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:30:17-76
+	android:name
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:30:27-73
+category#android.intent.category.BROWSABLE
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:31:17-78
+	android:name
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:31:27-75
+data
+ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:32:17-54
+	android:scheme
+		ADDED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml:32:23-51
+uses-sdk
+INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml
+INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml
+MERGED from [com.google.accompanist:accompanist-systemuicontroller:0.32.0] /home/turizspace/.gradle/caches/transforms-3/ca66da7ae7f4e0058b90124b9c5658c3/transformed/accompanist-systemuicontroller-0.32.0/AndroidManifest.xml:21:5-44
+MERGED from [com.google.accompanist:accompanist-systemuicontroller:0.32.0] /home/turizspace/.gradle/caches/transforms-3/ca66da7ae7f4e0058b90124b9c5658c3/transformed/accompanist-systemuicontroller-0.32.0/AndroidManifest.xml:21:5-44
+MERGED from [com.google.accompanist:accompanist-flowlayout:0.32.0] /home/turizspace/.gradle/caches/transforms-3/a9ed6f4cdb58e8369b379c47d304fd60/transformed/accompanist-flowlayout-0.32.0/AndroidManifest.xml:21:5-44
+MERGED from [com.google.accompanist:accompanist-flowlayout:0.32.0] /home/turizspace/.gradle/caches/transforms-3/a9ed6f4cdb58e8369b379c47d304fd60/transformed/accompanist-flowlayout-0.32.0/AndroidManifest.xml:21:5-44
+MERGED from [io.coil-kt:coil-compose:2.4.0] /home/turizspace/.gradle/caches/transforms-3/6715d8dbddbfa0f3789d3d9a96a2d90f/transformed/coil-compose-2.4.0/AndroidManifest.xml:5:5-44
+MERGED from [io.coil-kt:coil-compose:2.4.0] /home/turizspace/.gradle/caches/transforms-3/6715d8dbddbfa0f3789d3d9a96a2d90f/transformed/coil-compose-2.4.0/AndroidManifest.xml:5:5-44
+MERGED from [io.coil-kt:coil-compose-base:2.4.0] /home/turizspace/.gradle/caches/transforms-3/0e281ef82eb451f56b20b1425d8805e4/transformed/coil-compose-base-2.4.0/AndroidManifest.xml:5:5-44
+MERGED from [io.coil-kt:coil-compose-base:2.4.0] /home/turizspace/.gradle/caches/transforms-3/0e281ef82eb451f56b20b1425d8805e4/transformed/coil-compose-base-2.4.0/AndroidManifest.xml:5:5-44
+MERGED from [io.coil-kt:coil:2.4.0] /home/turizspace/.gradle/caches/transforms-3/dd31f39318ad407ea5956083d3bdd728/transformed/coil-2.4.0/AndroidManifest.xml:5:5-44
+MERGED from [io.coil-kt:coil:2.4.0] /home/turizspace/.gradle/caches/transforms-3/dd31f39318ad407ea5956083d3bdd728/transformed/coil-2.4.0/AndroidManifest.xml:5:5-44
+MERGED from [io.coil-kt:coil-base:2.4.0] /home/turizspace/.gradle/caches/transforms-3/05edac2cf6fb9f514a09bbe264a4e510/transformed/coil-base-2.4.0/AndroidManifest.xml:5:5-44
+MERGED from [io.coil-kt:coil-base:2.4.0] /home/turizspace/.gradle/caches/transforms-3/05edac2cf6fb9f514a09bbe264a4e510/transformed/coil-base-2.4.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/turizspace/.gradle/caches/transforms-3/a10a19056fdb5fd9d349329dcf31b4bc/transformed/appcompat-resources-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/turizspace/.gradle/caches/transforms-3/a10a19056fdb5fd9d349329dcf31b4bc/transformed/appcompat-resources-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/turizspace/.gradle/caches/transforms-3/a7bb92b2b627f24feacdb17b4f7193ea/transformed/appcompat-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/turizspace/.gradle/caches/transforms-3/a7bb92b2b627f24feacdb17b4f7193ea/transformed/appcompat-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.navigation:navigation-common:2.7.4] /home/turizspace/.gradle/caches/transforms-3/b414d187fee28f53751d83743f33a754/transformed/navigation-common-2.7.4/AndroidManifest.xml:20:5-44
+MERGED from [androidx.navigation:navigation-common:2.7.4] /home/turizspace/.gradle/caches/transforms-3/b414d187fee28f53751d83743f33a754/transformed/navigation-common-2.7.4/AndroidManifest.xml:20:5-44
+MERGED from [androidx.navigation:navigation-runtime:2.7.4] /home/turizspace/.gradle/caches/transforms-3/2f8de3a39aee87a45e2ddfb6e4a96897/transformed/navigation-runtime-2.7.4/AndroidManifest.xml:20:5-44
+MERGED from [androidx.navigation:navigation-runtime:2.7.4] /home/turizspace/.gradle/caches/transforms-3/2f8de3a39aee87a45e2ddfb6e4a96897/transformed/navigation-runtime-2.7.4/AndroidManifest.xml:20:5-44
+MERGED from [androidx.navigation:navigation-common-ktx:2.7.4] /home/turizspace/.gradle/caches/transforms-3/5bf29808a12bcbba915514923b54df92/transformed/navigation-common-ktx-2.7.4/AndroidManifest.xml:5:5-44
+MERGED from [androidx.navigation:navigation-common-ktx:2.7.4] /home/turizspace/.gradle/caches/transforms-3/5bf29808a12bcbba915514923b54df92/transformed/navigation-common-ktx-2.7.4/AndroidManifest.xml:5:5-44
+MERGED from [androidx.navigation:navigation-runtime-ktx:2.7.4] /home/turizspace/.gradle/caches/transforms-3/a367daf72e6646501ebcb73eee360312/transformed/navigation-runtime-ktx-2.7.4/AndroidManifest.xml:5:5-44
+MERGED from [androidx.navigation:navigation-runtime-ktx:2.7.4] /home/turizspace/.gradle/caches/transforms-3/a367daf72e6646501ebcb73eee360312/transformed/navigation-runtime-ktx-2.7.4/AndroidManifest.xml:5:5-44
+MERGED from [androidx.navigation:navigation-compose:2.7.4] /home/turizspace/.gradle/caches/transforms-3/38ae5c57db6457a8e2f94ad848b3b8d4/transformed/navigation-compose-2.7.4/AndroidManifest.xml:5:5-44
+MERGED from [androidx.navigation:navigation-compose:2.7.4] /home/turizspace/.gradle/caches/transforms-3/38ae5c57db6457a8e2f94ad848b3b8d4/transformed/navigation-compose-2.7.4/AndroidManifest.xml:5:5-44
+MERGED from [androidx.fragment:fragment:1.3.6] /home/turizspace/.gradle/caches/transforms-3/ecbfaf0e2bab4937ecb1dfadf5ffd9fa/transformed/fragment-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.fragment:fragment:1.3.6] /home/turizspace/.gradle/caches/transforms-3/ecbfaf0e2bab4937ecb1dfadf5ffd9fa/transformed/fragment-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.compose.material:material-ripple-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/58033b743f8e387b9c90ed54551dd774/transformed/material-ripple-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-ripple-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/58033b743f8e387b9c90ed54551dd774/transformed/material-ripple-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-core-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/20cb0b2d2742456ce1b3181be1213c94/transformed/material-icons-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-core-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/20cb0b2d2742456ce1b3181be1213c94/transformed/material-icons-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-extended-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/b7e171a5ac55b62d0ff293acba5ee48d/transformed/material-icons-extended-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-extended-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/b7e171a5ac55b62d0ff293acba5ee48d/transformed/material-icons-extended-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/435bddb81f65e994b15a0a0b85f75a62/transformed/foundation-layout-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/435bddb81f65e994b15a0a0b85f75a62/transformed/foundation-layout-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8aa8ea612323e92623b359bc9938cd46/transformed/foundation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8aa8ea612323e92623b359bc9938cd46/transformed/foundation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-core-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/a4765ef618a59c64f87e4ceec8e429b8/transformed/animation-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-core-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/a4765ef618a59c64f87e4ceec8e429b8/transformed/animation-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/7564b827742308b3751a383d6e0c9bc4/transformed/animation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/7564b827742308b3751a383d6e0c9bc4/transformed/animation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-tooling-data-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/c9add33b771031eaed10dc6768f3e68e/transformed/ui-tooling-data-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-tooling-data-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/c9add33b771031eaed10dc6768f3e68e/transformed/ui-tooling-data-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-unit-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/cd56d3ad23560765a83557124e517de5/transformed/ui-unit-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-unit-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/cd56d3ad23560765a83557124e517de5/transformed/ui-unit-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-geometry-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/398accc779e7bf3e984f683797ec5b59/transformed/ui-geometry-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-geometry-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/398accc779e7bf3e984f683797ec5b59/transformed/ui-geometry-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-text-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/80788f59fbf2e1217c2eceee7a0e41b9/transformed/ui-text-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-text-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/80788f59fbf2e1217c2eceee7a0e41b9/transformed/ui-text-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-util-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8c79e50366da0c399cf1f55b4eda9a35/transformed/ui-util-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-util-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8c79e50366da0c399cf1f55b4eda9a35/transformed/ui-util-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/07516b0118f69e2a61ade0646b3ae14b/transformed/ui-tooling-preview-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/07516b0118f69e2a61ade0646b3ae14b/transformed/ui-tooling-preview-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.ui:ui-graphics-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/f260e03c4629cf272477d69f232f4a60/transformed/ui-graphics-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-graphics-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/f260e03c4629cf272477d69f232f4a60/transformed/ui-graphics-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-tooling-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8d60d19496bd79fa4d2b3b25d1f2de80/transformed/ui-tooling-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.ui:ui-tooling-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8d60d19496bd79fa4d2b3b25d1f2de80/transformed/ui-tooling-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.material:material-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/c0183c9b7190764eb2c2c5ce098eb967/transformed/material-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/c0183c9b7190764eb2c2c5ce098eb967/transformed/material-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.loader:loader:1.0.0] /home/turizspace/.gradle/caches/transforms-3/e46cdc0fed77ff1cec947f9b4fd2e074/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /home/turizspace/.gradle/caches/transforms-3/e46cdc0fed77ff1cec947f9b4fd2e074/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.emoji2:emoji2-views-helper:1.4.0] /home/turizspace/.gradle/caches/transforms-3/a96bbccc325660f9ad6e079adfae64b7/transformed/emoji2-views-helper-1.4.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2-views-helper:1.4.0] /home/turizspace/.gradle/caches/transforms-3/a96bbccc325660f9ad6e079adfae64b7/transformed/emoji2-views-helper-1.4.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /home/turizspace/.gradle/caches/transforms-3/cb1b2ecb2d43b098820570dcb7604f76/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /home/turizspace/.gradle/caches/transforms-3/cb1b2ecb2d43b098820570dcb7604f76/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.6.2] /home/turizspace/.gradle/caches/transforms-3/8de2ecc87a43aaac5ad01aa5894bf889/transformed/lifecycle-livedata-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.6.2] /home/turizspace/.gradle/caches/transforms-3/8de2ecc87a43aaac5ad01aa5894bf889/transformed/lifecycle-livedata-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.2] /home/turizspace/.gradle/caches/transforms-3/806f3c1d8d4fe3286fb5e294adebe7ab/transformed/lifecycle-viewmodel-savedstate-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.2] /home/turizspace/.gradle/caches/transforms-3/806f3c1d8d4fe3286fb5e294adebe7ab/transformed/lifecycle-viewmodel-savedstate-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.6.2] /home/turizspace/.gradle/caches/transforms-3/2417669d8190e469c1219be5d4c4fe9b/transformed/lifecycle-livedata-core-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.6.2] /home/turizspace/.gradle/caches/transforms-3/2417669d8190e469c1219be5d4c4fe9b/transformed/lifecycle-livedata-core-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2] /home/turizspace/.gradle/caches/transforms-3/54150a203bf28c5acf77fda5577be12f/transformed/lifecycle-viewmodel-ktx-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2] /home/turizspace/.gradle/caches/transforms-3/54150a203bf28c5acf77fda5577be12f/transformed/lifecycle-viewmodel-ktx-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /home/turizspace/.gradle/caches/transforms-3/108d276c961f871fbeda7a80508b1dc6/transformed/savedstate-ktx-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /home/turizspace/.gradle/caches/transforms-3/108d276c961f871fbeda7a80508b1dc6/transformed/savedstate-ktx-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate:1.2.1] /home/turizspace/.gradle/caches/transforms-3/78fec73fcd6c8a5db4b841e3bf6f2d17/transformed/savedstate-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate:1.2.1] /home/turizspace/.gradle/caches/transforms-3/78fec73fcd6c8a5db4b841e3bf6f2d17/transformed/savedstate-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.6.2] /home/turizspace/.gradle/caches/transforms-3/2ff18f0bef7dc5c3034d8b80f2bf4686/transformed/lifecycle-viewmodel-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.6.2] /home/turizspace/.gradle/caches/transforms-3/2ff18f0bef7dc5c3034d8b80f2bf4686/transformed/lifecycle-viewmodel-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2] /home/turizspace/.gradle/caches/transforms-3/ad32b08631d957cea88c357d926c5dcd/transformed/lifecycle-viewmodel-compose-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2] /home/turizspace/.gradle/caches/transforms-3/ad32b08631d957cea88c357d926c5dcd/transformed/lifecycle-viewmodel-compose-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [com.google.accompanist:accompanist-drawablepainter:0.30.1] /home/turizspace/.gradle/caches/transforms-3/ecb8dd562793942d06ed2215cdb6ec25/transformed/accompanist-drawablepainter-0.30.1/AndroidManifest.xml:21:5-23:42
+MERGED from [com.google.accompanist:accompanist-drawablepainter:0.30.1] /home/turizspace/.gradle/caches/transforms-3/ecb8dd562793942d06ed2215cdb6ec25/transformed/accompanist-drawablepainter-0.30.1/AndroidManifest.xml:21:5-23:42
+MERGED from [androidx.compose.ui:ui-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/905d0d54bd60df2a3399fd7a7eed846f/transformed/ui-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/905d0d54bd60df2a3399fd7a7eed846f/transformed/ui-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-test-manifest:1.5.3] /home/turizspace/.gradle/caches/transforms-3/4a3e82bf98f43e74de6b703cabee9b4c/transformed/ui-test-manifest-1.5.3/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.ui:ui-test-manifest:1.5.3] /home/turizspace/.gradle/caches/transforms-3/4a3e82bf98f43e74de6b703cabee9b4c/transformed/ui-test-manifest-1.5.3/AndroidManifest.xml:20:5-44
+MERGED from [androidx.activity:activity:1.8.0] /home/turizspace/.gradle/caches/transforms-3/fafd624207921c7547ede25074e61d74/transformed/activity-1.8.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.activity:activity:1.8.0] /home/turizspace/.gradle/caches/transforms-3/fafd624207921c7547ede25074e61d74/transformed/activity-1.8.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.activity:activity-compose:1.8.0] /home/turizspace/.gradle/caches/transforms-3/2a5274b4c9a018083e73db882c0f450f/transformed/activity-compose-1.8.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-compose:1.8.0] /home/turizspace/.gradle/caches/transforms-3/2a5274b4c9a018083e73db882c0f450f/transformed/activity-compose-1.8.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-ktx:1.8.0] /home/turizspace/.gradle/caches/transforms-3/e26433de1363886cdfeec8d4a4dab386/transformed/activity-ktx-1.8.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-ktx:1.8.0] /home/turizspace/.gradle/caches/transforms-3/e26433de1363886cdfeec8d4a4dab386/transformed/activity-ktx-1.8.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /home/turizspace/.gradle/caches/transforms-3/34410db398728ef6a670605e11e5ff22/transformed/customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /home/turizspace/.gradle/caches/transforms-3/34410db398728ef6a670605e11e5ff22/transformed/customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
+MERGED from [androidx.core:core-ktx:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0d80b548ffd64a28b07f639bc58b6b0f/transformed/core-ktx-1.12.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.core:core-ktx:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0d80b548ffd64a28b07f639bc58b6b0f/transformed/core-ktx-1.12.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/turizspace/.gradle/caches/transforms-3/f10d429f47cbd40c23f706c475d9d18b/transformed/drawerlayout-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/turizspace/.gradle/caches/transforms-3/f10d429f47cbd40c23f706c475d9d18b/transformed/drawerlayout-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/turizspace/.gradle/caches/transforms-3/f1ad0a278c284f8907faaba2af5425a6/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/turizspace/.gradle/caches/transforms-3/f1ad0a278c284f8907faaba2af5425a6/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/turizspace/.gradle/caches/transforms-3/5df2d834be23d908dd25f92ec0a4a02c/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/turizspace/.gradle/caches/transforms-3/5df2d834be23d908dd25f92ec0a4a02c/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/turizspace/.gradle/caches/transforms-3/5c1863c27639e6ae415394bbe81b2132/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/turizspace/.gradle/caches/transforms-3/5c1863c27639e6ae415394bbe81b2132/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] /home/turizspace/.gradle/caches/transforms-3/8c9e6069cde1664df9510007524577cc/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] /home/turizspace/.gradle/caches/transforms-3/8c9e6069cde1664df9510007524577cc/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.autofill:autofill:1.0.0] /home/turizspace/.gradle/caches/transforms-3/d101d7b953d2d47fe1c7c6295921a126/transformed/autofill-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.autofill:autofill:1.0.0] /home/turizspace/.gradle/caches/transforms-3/d101d7b953d2d47fe1c7c6295921a126/transformed/autofill-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.6.2] /home/turizspace/.gradle/caches/transforms-3/bcd200311dbaaadf9b6834912e85e0e1/transformed/lifecycle-runtime-2.6.2/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.6.2] /home/turizspace/.gradle/caches/transforms-3/bcd200311dbaaadf9b6834912e85e0e1/transformed/lifecycle-runtime-2.6.2/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx:2.6.2] /home/turizspace/.gradle/caches/transforms-3/4bce5fb00c94a47bf05656af2a0d45f0/transformed/lifecycle-runtime-ktx-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx:2.6.2] /home/turizspace/.gradle/caches/transforms-3/4bce5fb00c94a47bf05656af2a0d45f0/transformed/lifecycle-runtime-ktx-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/78282d104aad4cb8ace3de70e0334cef/transformed/runtime-saveable-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/78282d104aad4cb8ace3de70e0334cef/transformed/runtime-saveable-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/fa9aed84fbb9445e7b65dc379b5c0a80/transformed/runtime-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/fa9aed84fbb9445e7b65dc379b5c0a80/transformed/runtime-release/AndroidManifest.xml:5:5-44
+MERGED from [fr.acinq.secp256k1:secp256k1-kmp-jni-android:0.10.1] /home/turizspace/.gradle/caches/transforms-3/9492ca1a16c9128b1e7449a935b7e333/transformed/secp256k1-kmp-jni-android-0.10.1/AndroidManifest.xml:5:5-7:41
+MERGED from [fr.acinq.secp256k1:secp256k1-kmp-jni-android:0.10.1] /home/turizspace/.gradle/caches/transforms-3/9492ca1a16c9128b1e7449a935b7e333/transformed/secp256k1-kmp-jni-android-0.10.1/AndroidManifest.xml:5:5-7:41
+MERGED from [androidx.security:security-crypto:1.1.0-alpha06] /home/turizspace/.gradle/caches/transforms-3/163d8a654da55f377a8d7b6dd7719e6a/transformed/security-crypto-1.1.0-alpha06/AndroidManifest.xml:20:5-44
+MERGED from [androidx.security:security-crypto:1.1.0-alpha06] /home/turizspace/.gradle/caches/transforms-3/163d8a654da55f377a8d7b6dd7719e6a/transformed/security-crypto-1.1.0-alpha06/AndroidManifest.xml:20:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] /home/turizspace/.gradle/caches/transforms-3/729213448632baf3e9c2e8e4bb5aa0f7/transformed/annotation-experimental-1.3.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] /home/turizspace/.gradle/caches/transforms-3/729213448632baf3e9c2e8e4bb5aa0f7/transformed/annotation-experimental-1.3.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/turizspace/.gradle/caches/transforms-3/cccdda48b9bc8fca34f144b0acd6c9fc/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/turizspace/.gradle/caches/transforms-3/cccdda48b9bc8fca34f144b0acd6c9fc/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/turizspace/.gradle/caches/transforms-3/1297a3707d58c4bf4bdb20d15c45a60e/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/turizspace/.gradle/caches/transforms-3/1297a3707d58c4bf4bdb20d15c45a60e/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/turizspace/.gradle/caches/transforms-3/6b6d82e2c44f419a5bf62276b91b3948/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/turizspace/.gradle/caches/transforms-3/6b6d82e2c44f419a5bf62276b91b3948/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /home/turizspace/.gradle/caches/transforms-3/773b2f550b00256d8508c075cba0a654/transformed/core-runtime-2.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /home/turizspace/.gradle/caches/transforms-3/773b2f550b00256d8508c075cba0a654/transformed/core-runtime-2.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:21:5-44
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:21:5-44
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/turizspace/.gradle/caches/transforms-3/e2580e4aeeaec6047bdd69f5e6a515e1/transformed/startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/turizspace/.gradle/caches/transforms-3/e2580e4aeeaec6047bdd69f5e6a515e1/transformed/startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.tracing:tracing:1.0.0] /home/turizspace/.gradle/caches/transforms-3/364f2645da04da70b2f0e046170e3b43/transformed/tracing-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.tracing:tracing:1.0.0] /home/turizspace/.gradle/caches/transforms-3/364f2645da04da70b2f0e046170e3b43/transformed/tracing-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.exifinterface:exifinterface:1.3.6] /home/turizspace/.gradle/caches/transforms-3/9add46c64d9e24d44c34f6963e784b0a/transformed/exifinterface-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.exifinterface:exifinterface:1.3.6] /home/turizspace/.gradle/caches/transforms-3/9add46c64d9e24d44c34f6963e784b0a/transformed/exifinterface-1.3.6/AndroidManifest.xml:20:5-22:41
+	android:targetSdkVersion
+		INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml
+	tools:ignore
+		ADDED from [com.google.accompanist:accompanist-drawablepainter:0.30.1] /home/turizspace/.gradle/caches/transforms-3/ecb8dd562793942d06ed2215cdb6ec25/transformed/accompanist-drawablepainter-0.30.1/AndroidManifest.xml:23:9-39
+	android:minSdkVersion
+		INJECTED from /home/turizspace/Downloads/Memely_Project_Scaffold/Memely/app/src/main/AndroidManifest.xml
+activity#androidx.compose.ui.tooling.PreviewActivity
+ADDED from [androidx.compose.ui:ui-tooling-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8d60d19496bd79fa4d2b3b25d1f2de80/transformed/ui-tooling-release/AndroidManifest.xml:23:9-25:39
+	android:exported
+		ADDED from [androidx.compose.ui:ui-tooling-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8d60d19496bd79fa4d2b3b25d1f2de80/transformed/ui-tooling-release/AndroidManifest.xml:25:13-36
+	android:name
+		ADDED from [androidx.compose.ui:ui-tooling-android:1.5.3] /home/turizspace/.gradle/caches/transforms-3/8d60d19496bd79fa4d2b3b25d1f2de80/transformed/ui-tooling-release/AndroidManifest.xml:24:13-71
+provider#androidx.startup.InitializationProvider
+ADDED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /home/turizspace/.gradle/caches/transforms-3/cb1b2ecb2d43b098820570dcb7604f76/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /home/turizspace/.gradle/caches/transforms-3/cb1b2ecb2d43b098820570dcb7604f76/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/turizspace/.gradle/caches/transforms-3/e2580e4aeeaec6047bdd69f5e6a515e1/transformed/startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/turizspace/.gradle/caches/transforms-3/e2580e4aeeaec6047bdd69f5e6a515e1/transformed/startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+	tools:node
+		ADDED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:28:13-31
+	android:authorities
+		ADDED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:26:13-68
+	android:exported
+		ADDED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:27:13-37
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:25:13-67
+meta-data#androidx.emoji2.text.EmojiCompatInitializer
+ADDED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.4.0] /home/turizspace/.gradle/caches/transforms-3/9c0d70d729831b195fdee2c5f02be709/transformed/emoji2-1.4.0/AndroidManifest.xml:30:17-75
+meta-data#androidx.lifecycle.ProcessLifecycleInitializer
+ADDED from [androidx.lifecycle:lifecycle-process:2.6.2] /home/turizspace/.gradle/caches/transforms-3/cb1b2ecb2d43b098820570dcb7604f76/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.lifecycle:lifecycle-process:2.6.2] /home/turizspace/.gradle/caches/transforms-3/cb1b2ecb2d43b098820570dcb7604f76/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.lifecycle:lifecycle-process:2.6.2] /home/turizspace/.gradle/caches/transforms-3/cb1b2ecb2d43b098820570dcb7604f76/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:30:17-78
+activity#androidx.activity.ComponentActivity
+ADDED from [androidx.compose.ui:ui-test-manifest:1.5.3] /home/turizspace/.gradle/caches/transforms-3/4a3e82bf98f43e74de6b703cabee9b4c/transformed/ui-test-manifest-1.5.3/AndroidManifest.xml:23:9-25:39
+	android:exported
+		ADDED from [androidx.compose.ui:ui-test-manifest:1.5.3] /home/turizspace/.gradle/caches/transforms-3/4a3e82bf98f43e74de6b703cabee9b4c/transformed/ui-test-manifest-1.5.3/AndroidManifest.xml:25:13-36
+	android:name
+		ADDED from [androidx.compose.ui:ui-test-manifest:1.5.3] /home/turizspace/.gradle/caches/transforms-3/4a3e82bf98f43e74de6b703cabee9b4c/transformed/ui-test-manifest-1.5.3/AndroidManifest.xml:24:13-63
+permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:23:9-81
+permission#com.memely.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:23:9-81
+uses-permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:26:22-94
+uses-permission#com.memely.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.12.0] /home/turizspace/.gradle/caches/transforms-3/0c88519d687a37650953210b14a346dd/transformed/core-1.12.0/AndroidManifest.xml:26:22-94
+meta-data#androidx.profileinstaller.ProfileInstallerInitializer
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:30:17-85
+receiver#androidx.profileinstaller.ProfileInstallReceiver
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:34:9-52:20
+	android:enabled
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:37:13-35
+	android:exported
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:38:13-36
+	android:permission
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:39:13-57
+	android:directBootAware
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:36:13-44
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:35:13-76
+intent-filter#action:name:androidx.profileinstaller.action.INSTALL_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:40:13-42:29
+action#androidx.profileinstaller.action.INSTALL_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:17-91
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:25-88
+intent-filter#action:name:androidx.profileinstaller.action.SKIP_FILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:43:13-45:29
+action#androidx.profileinstaller.action.SKIP_FILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:17-85
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:25-82
+intent-filter#action:name:androidx.profileinstaller.action.SAVE_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:46:13-48:29
+action#androidx.profileinstaller.action.SAVE_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:17-88
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:25-85
+intent-filter#action:name:androidx.profileinstaller.action.BENCHMARK_OPERATION
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:49:13-51:29
+action#androidx.profileinstaller.action.BENCHMARK_OPERATION
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:17-95
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/turizspace/.gradle/caches/transforms-3/6079fc06136acf82e3936c5574dcdb94/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:25-92
