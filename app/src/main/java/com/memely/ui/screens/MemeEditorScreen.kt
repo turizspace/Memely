@@ -4,16 +4,21 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.ModalBottomSheetLayout
+import androidx.compose.material.ModalBottomSheetValue
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.memely.ui.viewmodels.MemeOverlayImage
 import androidx.compose.ui.unit.dp
@@ -22,6 +27,8 @@ import kotlinx.coroutines.launch
 import com.memely.ui.components.editor.ColorPickerDialog
 import com.memely.ui.components.editor.EditorControls
 import com.memely.ui.components.editor.MemeCanvas
+import com.memely.ui.components.editor.TextFormattingPanel
+import com.memely.ui.components.editor.ImageEditingPanel
 import com.memely.ui.utils.MemeFileSaver
 import com.memely.ui.viewmodels.MemeEditorViewModel
 import androidx.compose.ui.platform.LocalContext
@@ -38,6 +45,7 @@ import com.memely.nostr.AmberSignerManager
 import com.memely.nostr.NostrRepository
 import java.io.File
 
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun MemeEditorScreen(
     imageUri: Uri,
@@ -65,6 +73,9 @@ fun MemeEditorScreen(
 
     var showColorPicker by remember { mutableStateOf(false) }
     var showComposeDialog by remember { mutableStateOf(false) }
+    var showTextFormattingPanel by remember { mutableStateOf(false) }
+    var showImageEditingPanel by remember { mutableStateOf(false) }
+    var isSavingToDevice by remember { mutableStateOf(false) }
     var uploadedImageUrl by remember { mutableStateOf<String?>(null) }
     var savedMemeFile by remember { mutableStateOf<File?>(null) }
 
@@ -303,7 +314,40 @@ fun MemeEditorScreen(
                         )
                     }
                 },
-                isPostingToNostr = viewModel.isSaving || isUploadingToBlossom
+                isPostingToNostr = viewModel.isSaving || isUploadingToBlossom,
+                onSaveToDevice = {
+                    isSavingToDevice = true
+                    coroutineScope.launch(Dispatchers.IO) {
+                        MemeFileSaver.saveMeme(
+                            context = context,
+                            imageUri = imageUri,
+                            texts = viewModel.texts,
+                            overlays = viewModel.overlays,
+                            baseImageSize = viewModel.baseImageSize,
+                            originalImageWidth = viewModel.originalImageWidth,
+                            originalImageHeight = viewModel.originalImageHeight,
+                            imageOffsetX = viewModel.imageOffsetX,
+                            imageOffsetY = viewModel.imageOffsetY,
+                            onSuccess = { path ->
+                                coroutineScope.launch(Dispatchers.Main) {
+                                    isSavingToDevice = false
+                                    println("✅ Meme saved to: $path")
+                                }
+                            },
+                            onError = {
+                                coroutineScope.launch(Dispatchers.Main) {
+                                    isSavingToDevice = false
+                                    println("❌ Failed to save meme")
+                                }
+                            }
+                        )
+                    }
+                },
+                isSavingToDevice = isSavingToDevice,
+                onShowTextFormatting = { showTextFormattingPanel = true },
+                onShowImageEditing = { showImageEditingPanel = true },
+                selectedIsText = viewModel.selectedIsText && viewModel.selectedLayerIndex != null,
+                selectedIsImage = !viewModel.selectedIsText && viewModel.selectedLayerIndex != null
             )
         }
     ) { paddingValues ->
@@ -329,6 +373,76 @@ fun MemeEditorScreen(
                 showColorPicker = false
             }
         )
+    }
+
+    // Text Formatting Panel
+    if (showTextFormattingPanel) {
+        val selectedText = viewModel.getSelectedText()
+        if (selectedText != null) {
+            val textFormattingSheetState = rememberModalBottomSheetState(
+                initialValue = ModalBottomSheetValue.Expanded
+            )
+            
+            // Dismiss when state changes to hidden
+            if (!textFormattingSheetState.isVisible) {
+                LaunchedEffect(Unit) {
+                    showTextFormattingPanel = false
+                }
+            }
+            
+            ModalBottomSheetLayout(
+                sheetContent = {
+                    TextFormattingPanel(
+                        fontSize = selectedText.fontSize.value,
+                        fontFamily = selectedText.fontFamily,
+                        fontWeight = selectedText.fontWeight,
+                        fontStyle = selectedText.fontStyle,
+                        textAlign = selectedText.textAlign,
+                        onFontSizeChange = { viewModel.updateSelectedTextFontSize(it.sp) },
+                        onFontFamilyChange = { viewModel.updateSelectedTextFontFamily(it) },
+                        onFontWeightChange = { viewModel.updateSelectedTextFontWeight(it) },
+                        onFontStyleChange = { viewModel.updateSelectedTextFontStyle(it) },
+                        onTextAlignChange = { viewModel.updateSelectedTextAlign(it) }
+                    )
+                },
+                sheetState = textFormattingSheetState,
+                scrimColor = Color.Black.copy(alpha = 0.32f)
+            ) {}
+        }
+    }
+
+    // Image Editing Panel
+    if (showImageEditingPanel) {
+        val selectedImage = viewModel.getSelectedImage()
+        if (selectedImage != null) {
+            val imageEditingSheetState = rememberModalBottomSheetState(
+                initialValue = ModalBottomSheetValue.Expanded
+            )
+            
+            // Dismiss when state changes to hidden
+            if (!imageEditingSheetState.isVisible) {
+                LaunchedEffect(Unit) {
+                    showImageEditingPanel = false
+                }
+            }
+            
+            ModalBottomSheetLayout(
+                sheetContent = {
+                    ImageEditingPanel(
+                        cornerRadius = selectedImage.cornerRadius.value,
+                        alpha = selectedImage.alpha,
+                        rotation = selectedImage.rotation,
+                        scale = selectedImage.scale,
+                        onCornerRadiusChange = { viewModel.updateSelectedImageCornerRadius(it.dp) },
+                        onAlphaChange = { viewModel.updateSelectedImageAlpha(it) },
+                        onRotationChange = { viewModel.updateSelectedImageRotation(it) },
+                        onScaleChange = { viewModel.updateSelectedImageScale(it) }
+                    )
+                },
+                sheetState = imageEditingSheetState,
+                scrimColor = Color.Black.copy(alpha = 0.32f)
+            ) {}
+        }
     }
 
     // Compose note dialog for posting to Nostr
