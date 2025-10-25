@@ -3,6 +3,7 @@ package com.memely.ui.components.editor
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -48,18 +49,22 @@ fun ImageLayerBox(
         modifier = modifier
             .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
             .size(width = width, height = height)
-            .graphicsLayer(rotationZ = rotation)
+            .graphicsLayer(
+                rotationZ = rotation,
+                alpha = overlay.alpha
+            )
             .border(
                 width = if (overlay.selected) 2.dp else 0.dp,
                 color = if (overlay.selected) Color.Green else Color.Transparent,
-                shape = RoundedCornerShape(4.dp)
+                shape = RoundedCornerShape(overlay.cornerRadius)
             )
             .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    offset += dragAmount
+                detectTransformGestures { _, pan, zoom, rotationDelta ->
+                    offset += pan
+                    scale = (scale * zoom).coerceIn(0.5f, 3f)
+                    rotation += rotationDelta
                     onTransformChange(offset, scale, rotation)
-                    println("🖼 ImageLayerBox drag idx=$index offset=$offset scale=$scale rotation=$rotation")
+                    println("🖼 ImageLayerBox transform idx=$index offset=$offset scale=$scale rotation=$rotation")
                 }
             }
             .clickable {
@@ -69,8 +74,13 @@ fun ImageLayerBox(
         AsyncImage(
             model = overlay.uri,
             contentDescription = "Overlay Image",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    clip = true,
+                    shape = RoundedCornerShape(overlay.cornerRadius)
+                ),
+            contentScale = ContentScale.Crop
         )
     }
 }
