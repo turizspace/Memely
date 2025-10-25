@@ -2,6 +2,7 @@ package com.memely.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -179,6 +180,7 @@ private fun ReplyThreadItem(reply: MemeNote) {
     var isSubmittingReply by remember { mutableStateOf(false) }
     var isPublishingReaction by remember { mutableStateOf(false) }
     var isPublishingRepost by remember { mutableStateOf(false) }
+    var showNestedThread by remember { mutableStateOf(false) }
     
     // Observe cache updates
     val cacheUpdates = UserMetadataCache.cacheUpdateFlow.collectAsState()
@@ -211,7 +213,12 @@ private fun ReplyThreadItem(reply: MemeNote) {
             .padding(12.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { 
+                    showNestedThread = true 
+                    println("🔗 Opening nested thread for reply ${reply.id.take(8)}")
+                }
         ) {
             // Author section with avatar and metadata
             Row(
@@ -264,12 +271,6 @@ private fun ReplyThreadItem(reply: MemeNote) {
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.onSurface,
                         maxLines = 1
-                    )
-                    
-                    Text(
-                        text = reply.pubkey.take(16) + "...",
-                        style = MaterialTheme.typography.caption,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
                     )
                 }
                 
@@ -415,6 +416,14 @@ private fun ReplyThreadItem(reply: MemeNote) {
             },
             isLoading = isSubmittingReply,
             targetAuthor = authorMetadata.value?.name ?: reply.pubkey.take(16)
+        )
+    }
+    
+    // Nested thread dialog for viewing replies to this reply
+    if (showNestedThread) {
+        ThreadViewDialog(
+            eventId = reply.id,
+            onDismiss = { showNestedThread = false }
         )
     }
 }

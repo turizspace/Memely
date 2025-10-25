@@ -477,7 +477,7 @@ object NostrRepository {
         // Kind 1: replies with e-tag matching eventId
         // Kind 7: reactions with e-tag matching eventId
         // Kind 6: reposts with e-tag matching eventId
-        val req = """["REQ","$subId",{"kinds":[1,6,7],"#e":["$eventId"]},{"limit":100}]"""
+        val req = """["REQ","$subId",{"kinds":[1,6,7],"#e":["$eventId"],"limit":100}]"""
         
         relayPool.broadcast(req)
         println("📡 NostrRepository: Subscribed to interactions for event $eventId with subscription $subId")

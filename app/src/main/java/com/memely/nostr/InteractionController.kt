@@ -52,6 +52,12 @@ object InteractionController {
         }
         tags.put(pTag)
         
+        // Add client tag
+        val clientTag = JSONArray()
+        clientTag.put("client")
+        clientTag.put("Memely")
+        tags.put(clientTag)
+        
         return NostrEvent(
             kind = 7,
             content = content,
@@ -95,6 +101,12 @@ object InteractionController {
         pTag.put(0, "p")
         pTag.put(1, targetPubkey)
         tags.put(pTag)
+        
+        // Add client tag
+        val clientTag = JSONArray()
+        clientTag.put("client")
+        clientTag.put("Memely")
+        tags.put(clientTag)
         
         return NostrEvent(
             kind = 6,
@@ -143,6 +155,12 @@ object InteractionController {
             pTag.put(2, relayUrl)
         }
         tags.put(pTag)
+        
+        // Add client tag
+        val clientTag = JSONArray()
+        clientTag.put("client")
+        clientTag.put("Memely")
+        tags.put(clientTag)
         
         return NostrEvent(
             kind = 1,
