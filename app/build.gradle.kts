@@ -35,6 +35,15 @@ android {
         apiVersion = "1.8"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("turiz.keystore")
+            storePassword = "ch0wd3r@t"
+            keyAlias = "mykey"
+            keyPassword = "ch0wd3r@t"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -42,6 +51,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
