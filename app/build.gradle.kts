@@ -54,6 +54,34 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
     }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val buildType = variant.buildType.name
+            val newName = "memely-v${defaultConfig.versionName}-${buildType}.apk"
+            output.outputFileName = newName
+        }
+    }
+
+    bundle {
+        density.enableSplit = true
+        language.enableSplit = true
+    }
+}
+
+tasks.all {
+    if (name == "bundleRelease") {
+        doLast {
+            val bundleFile = File("$buildDir/outputs/bundle/release/app-release.aab")
+            val newBundleFile = File("$buildDir/outputs/bundle/release/memely-v${android.defaultConfig.versionName}.aab")
+            if (bundleFile.exists() && !newBundleFile.exists()) {
+                bundleFile.renameTo(newBundleFile)
+                println("Renamed bundle to: memely-v${android.defaultConfig.versionName}.aab")
+            }
+        }
+    }
 }
 
 dependencies {
