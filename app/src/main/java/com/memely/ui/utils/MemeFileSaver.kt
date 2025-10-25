@@ -115,12 +115,18 @@ object MemeFileSaver {
                         val finalWidth = (displayWidthPx * overlay.scale * scale).toInt()
                         val finalHeight = (displayHeightPx * overlay.scale * scale).toInt()
 
-                        val scaledBmp = Bitmap.createScaledBitmap(
+                        var scaledBmp = Bitmap.createScaledBitmap(
                             overlayBmp,
                             finalWidth,
                             finalHeight,
                             true
                         )
+                        
+                        // Apply corner radius if specified
+                        if (overlay.cornerRadius.value > 0) {
+                            val radiusPx = (overlay.cornerRadius.value * density).toInt()
+                            scaledBmp = createRoundedBitmap(scaledBmp, radiusPx)
+                        }
 
                         // Apply position scaling, accounting for image offset
                         val adjustedX = overlay.position.x - imageOffsetX
@@ -128,13 +134,19 @@ object MemeFileSaver {
                         val scaledX = adjustedX * scale
                         val scaledY = adjustedY * scale
 
+                        // Apply alpha to paint
+                        paint.alpha = (overlay.alpha * 255).toInt()
+
                         // FIX: Draw at exact position without extra translations
-                        println("🔎 MemeFileSaver overlay: uri=${overlay.uri}, pos=(${overlay.position.x},${overlay.position.y}), adjusted=(${adjustedX},${adjustedY}), scaled=(${scaledX},${scaledY}), final=(${finalWidth}x${finalHeight}), userScale=${overlay.scale}, rotation=${overlay.rotation}")
+                        println("🔎 MemeFileSaver overlay: uri=${overlay.uri}, pos=(${overlay.position.x},${overlay.position.y}), adjusted=(${adjustedX},${adjustedY}), scaled=(${scaledX},${scaledY}), final=(${finalWidth}x${finalHeight}), userScale=${overlay.scale}, rotation=${overlay.rotation}, alpha=${overlay.alpha}, cornerRadius=${overlay.cornerRadius.value}")
                         canvas.save()
                         canvas.translate(scaledX, scaledY) // Position to top-left corner
                         canvas.rotate(overlay.rotation, finalWidth / 2f, finalHeight / 2f) // Rotate around center
                         canvas.drawBitmap(scaledBmp, 0f, 0f, paint)
                         canvas.restore()
+                        
+                        // Reset paint alpha
+                        paint.alpha = 255
 
                         scaledBmp.recycle()
                         overlayBmp.recycle()
@@ -168,17 +180,31 @@ object MemeFileSaver {
                 // Log computed values for debugging alignment
                 println("🔎 MemeFileSaver text: text='${text.text}', pos=(${text.position.x},${text.position.y}), adjusted=(${adjustedX},${adjustedY}), scaled=(${scaledX},${scaledY}), textSizePx=${textPaint.textSize}, rotation=${text.rotation}")
 
-                // Measure text and compute baseline so we draw text with top-left alignment
-                val textWidth = textPaint.measureText(text.text)
+                // Split text into lines for multi-line support
+                val lines = text.text.split("\n")
+                
+                // Measure text dimensions
                 val fm = textPaint.fontMetrics
-                val textHeight = fm.descent - fm.ascent
+                val lineHeight = fm.descent - fm.ascent
                 val baselineOffset = -fm.ascent // drawText y-position to make top = 0
+                
+                // Calculate total text height
+                val totalTextHeight = lineHeight * lines.size
+                
+                // Find the widest line for rotation center calculation
+                val textWidth = lines.maxOfOrNull { line -> textPaint.measureText(line) } ?: 0f
 
                 // Draw text rotated around its center to match Compose's graphicsLayer default transform origin
                 canvas.save()
                 canvas.translate(scaledX, scaledY)
-                canvas.rotate(text.rotation, textWidth / 2f, textHeight / 2f)
-                canvas.drawText(text.text, 0f, baselineOffset, textPaint)
+                canvas.rotate(text.rotation, textWidth / 2f, totalTextHeight / 2f)
+                
+                // Draw each line
+                lines.forEachIndexed { lineIndex, line ->
+                    val lineY = lineIndex * lineHeight + baselineOffset
+                    canvas.drawText(line, 0f, lineY, textPaint)
+                }
+                
                 canvas.restore()
             }
 
@@ -216,5 +242,25 @@ object MemeFileSaver {
             e.printStackTrace()
             onError()
         }
+    }
+    
+    /**
+     * Create a bitmap with rounded corners
+     */
+    private fun createRoundedBitmap(bitmap: Bitmap, radius: Int): Bitmap {
+        val output = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.BLACK
+        }
+        
+        val rect = android.graphics.RectF(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat())
+        canvas.drawRoundRect(rect, radius.toFloat(), radius.toFloat(), paint)
+        
+        paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+        canvas.drawBitmap(bitmap, 0f, 0f, paint)
+        
+        return output
     }
 }
