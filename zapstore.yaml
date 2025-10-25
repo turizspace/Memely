@@ -1,0 +1,11 @@
+repository: https://github.com/turizspace/Memely
+name: Memely
+summary: Memely - Professional meme editor on Nostr
+description: Memely is a professional meme editing and sharing app built on the Nostr protocol. Create memes with text, images, and professional editing controls, then share them directly to the Nostr network with full interaction support.
+icon: app/src/main/res/drawable/ic_launcher_foreground.png
+license: MIT
+tags: nostr android memes
+remote_metadata:
+  - github
+assets:
+  - '.*\.apk'
