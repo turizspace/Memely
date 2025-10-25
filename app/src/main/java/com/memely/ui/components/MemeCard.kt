@@ -2,6 +2,7 @@ package com.memely.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +16,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +30,13 @@ import com.memely.nostr.MemeNote
 import com.memely.nostr.MetadataParser
 import com.memely.nostr.UserMetadataCache
 import com.memely.nostr.NostrRepository
+import com.memely.data.InteractionRepository
+import com.memely.nostr.InteractionController
+import com.memely.nostr.InteractionPublisher
+import com.memely.nostr.AmberSignerManager
+import org.json.JSONObject
+import org.json.JSONArray
+import kotlinx.coroutines.launch
 
 @Composable
 fun MemeCard(
@@ -36,6 +45,15 @@ fun MemeCard(
 ) {
     // Debug the incoming note
     println("🎨 MemeCard: Rendering note from ${memeNote.pubkey.take(8)} - ID: ${memeNote.id.take(8)}")
+    
+    val scope = rememberCoroutineScope()
+    
+    // Interaction dialogs state
+    var showReplyDialog by remember { mutableStateOf(false) }
+    var showThreadView by remember { mutableStateOf(false) }
+    var isSubmittingReply by remember { mutableStateOf(false) }
+    var isPublishingReaction by remember { mutableStateOf(false) }
+    var isPublishingRepost by remember { mutableStateOf(false) }
     
     // Try to get cached metadata immediately
     val cached = UserMetadataCache.getCachedMetadata(memeNote.pubkey)
@@ -91,13 +109,14 @@ fun MemeCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // User info row
+            // User info row with actions menu
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Profile picture
@@ -143,6 +162,12 @@ fun MemeCard(
                         }
                     }
                 }
+                
+                // 3-dot menu
+                NoteActionsMenu(
+                    noteId = memeNote.id,
+                    pubkey = memeNote.pubkey
+                )
             }
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -176,7 +201,8 @@ fun MemeCard(
                         .fillMaxWidth()
                         .aspectRatio(aspectRatio)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFFF3F4F6)),
+                        .background(Color(0xFFF3F4F6))
+                        .clickable { showThreadView = true },
                     contentScale = ContentScale.Crop
                 )
             }
@@ -193,11 +219,121 @@ fun MemeCard(
                     maxLines = 2
                 )
             }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Interaction controls
+            InteractionControlsBox(
+                eventId = memeNote.id,
+                authorPubkey = memeNote.pubkey,
+                onReplyClick = { showReplyDialog = true },
+                onReactClick = { emoji ->
+                    // Handle reaction - publish to Nostr
+                    scope.launch {
+                        try {
+                            isPublishingReaction = true
+                            println("❤️ MemeCard: Publishing reaction: $emoji")
+                            InteractionPublisher.publishReaction(
+                                targetEventId = memeNote.id,
+                                targetPubkey = memeNote.pubkey,
+                                content = emoji
+                            )
+                            println("✅ MemeCard: Reaction published successfully")
+                            InteractionRepository.invalidateCache(memeNote.id)
+                        } catch (e: Exception) {
+                            println("❌ MemeCard: Failed to publish reaction: ${e.message}")
+                        } finally {
+                            isPublishingReaction = false
+                        }
+                    }
+                },
+                onRepostClick = {
+                    // Handle repost - publish to Nostr
+                    scope.launch {
+                        try {
+                            isPublishingRepost = true
+                            println("🔄 MemeCard: Publishing repost")
+                            InteractionPublisher.publishRepost(
+                                targetEventId = memeNote.id,
+                                targetPubkey = memeNote.pubkey,
+                                originalEventJson = memeNote.toJson()
+                            )
+                            println("✅ MemeCard: Repost published successfully")
+                            InteractionRepository.invalidateCache(memeNote.id)
+                        } catch (e: Exception) {
+                            println("❌ MemeCard: Failed to publish repost: ${e.message}")
+                        } finally {
+                            isPublishingRepost = false
+                        }
+                    }
+                }
+            )
         }
+    }
+    
+    // Reply dialog
+    if (showReplyDialog) {
+        ReplyDialog(
+            onDismiss = { showReplyDialog = false },
+            onSubmit = { replyText ->
+                scope.launch {
+                    try {
+                        isSubmittingReply = true
+                        println("💬 MemeCard: Submitting reply: $replyText")
+                        
+                        // Publish reply to Nostr
+                        InteractionPublisher.publishReply(
+                            content = replyText,
+                            replyToEventId = memeNote.id,
+                            replyToPubkey = memeNote.pubkey
+                        )
+                        
+                        println("✅ MemeCard: Reply published successfully")
+                        
+                        // Close dialog and refresh interactions
+                        showReplyDialog = false
+                        InteractionRepository.invalidateCache(memeNote.id)
+                    } catch (e: Exception) {
+                        println("❌ MemeCard: Failed to publish reply: ${e.message}")
+                        // Keep dialog open on error so user can retry
+                    } finally {
+                        isSubmittingReply = false
+                    }
+                }
+            },
+            isLoading = isSubmittingReply,
+            targetAuthor = userMetadata?.name ?: memeNote.pubkey.take(16)
+        )
+    }
+    
+    // Thread view dialog
+    if (showThreadView) {
+        ThreadViewDialog(
+            eventId = memeNote.id,
+            onDismiss = { showThreadView = false }
+        )
     }
 }
 
 // Helper functions
+private fun MemeNote.toJson(): String {
+    val json = JSONObject().apply {
+        put("id", id)
+        put("pubkey", pubkey)
+        put("content", content)
+        put("created_at", createdAt)
+        put("kind", 1)
+        val tagsArray = JSONArray()
+        tags.forEach { tagList ->
+            val tagArray = JSONArray()
+            tagList.forEach { tag -> tagArray.put(tag) }
+            tagsArray.put(tagArray)
+        }
+        put("tags", tagsArray)
+    }
+    return json.toString()
+}
+
 private fun extractImageUrl(content: String): String? {
     val imagePatterns = listOf(
         Regex("""https?://[^\s]+\.(jpg|jpeg|png|gif|webp)(\?[^\s]*)?"""),

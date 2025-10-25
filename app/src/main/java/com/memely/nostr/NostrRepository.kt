@@ -465,4 +465,47 @@ object NostrRepository {
     fun refreshMetadata(pubkey: String) {
         refreshProfile(pubkey)
     }
+    
+    /**
+     * Subscribe to interactions (replies, reactions, reposts) for an event
+     * Fetches kind 1 (replies), kind 7 (reactions), and kind 6 (reposts)
+     */
+    fun subscribeToReplies(eventId: String, subscriptionId: String = "interactions-${eventId.take(8)}", onMessage: (String) -> Unit) {
+        val subId = subscriptionId
+        
+        // Create a subscription for all interaction kinds
+        // Kind 1: replies with e-tag matching eventId
+        // Kind 7: reactions with e-tag matching eventId
+        // Kind 6: reposts with e-tag matching eventId
+        val req = """["REQ","$subId",{"kinds":[1,6,7],"#e":["$eventId"]},{"limit":100}]"""
+        
+        relayPool.broadcast(req)
+        println("📡 NostrRepository: Subscribed to interactions for event $eventId with subscription $subId")
+        
+        // Listen for messages
+        scope.launch {
+            incomingMessagesFlow.collect { message ->
+                try {
+                    val json = JSONArray(message)
+                    val msgType = json.optString(0, "")
+                    val msgSubId = json.optString(1, "")
+                    
+                    if (msgType == "EVENT" && msgSubId == subId) {
+                        val eventJson = json.optJSONObject(2)
+                        if (eventJson != null) {
+                            onMessage(eventJson.toString())
+                        }
+                    }
+                } catch (e: Exception) {
+                    println("❌ NostrRepository: Error parsing interaction message: ${e.message}")
+                }
+            }
+        }
+    }
+    
+    fun closeSubscription(subscriptionId: String) {
+        val req = """["CLOSE","$subscriptionId"]"""
+        relayPool.broadcast(req)
+        println("🔚 NostrRepository: Sent CLOSE for subscription $subscriptionId")
+    }
 }

@@ -30,6 +30,22 @@ object TemplateRepository {
     private val _errorFlow = MutableStateFlow<String?>(null)
     val errorFlow: StateFlow<String?> = _errorFlow
     
+    /**
+     * Search/filter templates by name
+     */
+    fun searchTemplates(query: String): List<MemeTemplate> {
+        val allTemplates = _templatesFlow.value
+        
+        if (query.isBlank()) {
+            return allTemplates
+        }
+        
+        val lowerQuery = query.lowercase()
+        return allTemplates.filter { template ->
+            template.name.lowercase().contains(lowerQuery)
+        }
+    }
+    
     suspend fun fetchTemplates() {
         _isLoadingFlow.value = true
         _errorFlow.value = null
