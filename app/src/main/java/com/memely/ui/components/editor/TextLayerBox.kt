@@ -3,6 +3,7 @@ package com.memely.ui.components.editor
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -53,11 +54,12 @@ fun TextLayerBox(
                 shape = RoundedCornerShape(4.dp)
             )
             .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    offset += dragAmount
+                detectTransformGestures { _, pan, zoom, rotationDelta ->
+                    offset += pan
+                    scale = (scale * zoom).coerceIn(0.5f, 3f)
+                    rotation += rotationDelta
                     onTransformChange(offset, scale, rotation)
-                    println("✏️ TextLayerBox drag idx=$index offset=$offset scale=$scale rotation=$rotation")
+                    println("✏️ TextLayerBox transform idx=$index offset=$offset scale=$scale rotation=$rotation")
                 }
             }
             .clickable {
@@ -76,20 +78,24 @@ fun TextLayerBox(
                 textStyle = TextStyle(
                     color = text.color,
                     fontSize = text.fontSize,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                    fontWeight = FontWeight.Bold
+                    fontFamily = text.fontFamily,
+                    fontWeight = text.fontWeight,
+                    fontStyle = text.fontStyle,
+                    textAlign = text.textAlign
                 ),
                 modifier = Modifier.wrapContentSize()
             )
         } else {
-            // Static text when not selected
+            // Display-only when not selected
             Text(
-                text = textValue,
+                text = text.text,
                 style = TextStyle(
                     color = text.color,
                     fontSize = text.fontSize,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                    fontWeight = FontWeight.Bold
+                    fontFamily = text.fontFamily,
+                    fontWeight = text.fontWeight,
+                    fontStyle = text.fontStyle,
+                    textAlign = text.textAlign
                 ),
                 modifier = Modifier.wrapContentSize()
             )
