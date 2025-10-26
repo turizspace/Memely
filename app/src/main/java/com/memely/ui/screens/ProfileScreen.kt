@@ -2,7 +2,10 @@ package com.memely.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
@@ -15,16 +18,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.memely.nostr.MetadataParser
+import com.memely.ui.components.LogoutButton
 
 @Composable
-fun ProfileScreen(user: MetadataParser.UserMetadata? = null) {
+fun ProfileScreen(
+    user: MetadataParser.UserMetadata? = null,
+    onLogout: (() -> Unit)? = null
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         contentAlignment = Alignment.TopCenter
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.verticalScroll(rememberScrollState())
+        ) {
 
             // Banner
             user?.banner?.let { bannerUrl ->
@@ -93,6 +103,21 @@ fun ProfileScreen(user: MetadataParser.UserMetadata? = null) {
                     text = "🌐 $it",
                     style = MaterialTheme.typography.caption
                 )
+            }
+
+            // Divider before logout section
+            if (onLogout != null) {
+                Spacer(Modifier.height(24.dp))
+                Divider(
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f)
+                        .padding(vertical = 12.dp)
+                )
+
+                // Logout Button Section
+                Spacer(Modifier.height(12.dp))
+                LogoutButton(onLogout = onLogout)
+                Spacer(Modifier.height(12.dp))
             }
         }
     }

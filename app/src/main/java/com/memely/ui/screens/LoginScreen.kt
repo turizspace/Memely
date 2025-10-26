@@ -2,12 +2,15 @@ package com.memely.ui.screens
 
 import android.content.Intent
 import android.util.Log
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.memely.R
 import com.memely.nostr.AmberSignerManager
 import com.memely.nostr.KeyStoreManager
 import kotlinx.coroutines.launch
@@ -30,6 +33,15 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // App Logo
+        Image(
+            painter = painterResource(id = R.mipmap.ic_launcher_foreground),
+            contentDescription = "Memely Logo",
+            modifier = Modifier
+                .size(120.dp)
+                .padding(bottom = 16.dp)
+        )
+        
         Text("🔑 Login to Memely", style = MaterialTheme.typography.h6)
         Spacer(modifier = Modifier.height(24.dp))
 

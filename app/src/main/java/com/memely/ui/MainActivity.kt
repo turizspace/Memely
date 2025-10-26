@@ -82,12 +82,18 @@ fun AppRoot(openUrl: (Intent) -> Unit) {
             openUrl = openUrl
         )
     } else {
-        AuthenticatedRoot()
+        AuthenticatedRoot(
+            onLogout = {
+                // Clear all stored keys and credentials
+                KeyStoreManager.clear()
+                loggedIn = false
+            }
+        )
     }
 }
 
 @Composable
-fun AuthenticatedRoot() {
+fun AuthenticatedRoot(onLogout: () -> Unit = {}) {
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
@@ -221,7 +227,10 @@ fun AuthenticatedRoot() {
                 }
             }
             composable("profile") {
-                ProfileScreen(user = userMetadata)
+                ProfileScreen(
+                    user = userMetadata,
+                    onLogout = onLogout
+                )
             }
             composable("meme_editor") {
                 if (selectedImageUri != null) {
