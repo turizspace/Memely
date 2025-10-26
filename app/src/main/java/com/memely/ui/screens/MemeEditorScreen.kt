@@ -31,18 +31,22 @@ import com.memely.ui.components.editor.TextFormattingPanel
 import com.memely.ui.components.editor.ImageEditingPanel
 import com.memely.ui.utils.MemeFileSaver
 import com.memely.ui.viewmodels.MemeEditorViewModel
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 import coil.compose.AsyncImage
 import com.memely.ui.components.nostr.ComposeNoteDialog
+import com.memely.ui.components.nostr.RelayStatusDialog
 import com.memely.ui.viewmodels.BlossomUploadViewModel
 import com.memely.ui.viewmodels.NostrPostViewModel
 import com.memely.nostr.KeyStoreManager
 import com.memely.nostr.NostrEventSigner
 import com.memely.nostr.AmberSignerManager
 import com.memely.nostr.NostrRepository
+import com.memely.nostr.RelayEventTracker
+import com.memely.nostr.RelayConnectionManager
+import com.memely.nostr.PublishResult
+import kotlinx.coroutines.delay
 import java.io.File
 
 @OptIn(ExperimentalMaterialApi::class)
@@ -57,13 +61,28 @@ fun MemeEditorScreen(
     val blossomViewModel = remember { BlossomUploadViewModel() }
     val nostrPostViewModel = remember { NostrPostViewModel() }
 
-    // Ensure relays are connected
+    // Manage persistent relay connections during meme editing
+    var showRelayStatus by remember { mutableStateOf(false) }
+    var publishResult: PublishResult? by remember { mutableStateOf(null) }
+    
     LaunchedEffect(Unit) {
+        // Initialize persistent relay connections
+        RelayConnectionManager.initialize()
+        
+        // Ensure relays are connected
         try {
-            NostrRepository.connectAll()
-            println("🔗 MemeEditorScreen: Connected to Nostr relays")
+            RelayConnectionManager.ensureConnected()
+            println("🔗 MemeEditorScreen: Persistent relay connections initialized")
         } catch (e: Exception) {
-            println("❌ MemeEditorScreen: Failed to connect to relays: ${e.message}")
+            println("❌ MemeEditorScreen: Failed to initialize relay connections: ${e.message}")
+        }
+    }
+    
+    DisposableEffect(Unit) {
+        onDispose {
+            // Release relay connection reference when leaving meme editor
+            RelayConnectionManager.release()
+            println("🔌 MemeEditorScreen: Released relay connection reference")
         }
     }
 
@@ -210,10 +229,20 @@ fun MemeEditorScreen(
                     }
                 },
                 onPostToNostr = {
-                    // Start the Post to Nostr workflow
+                    // Start the Post to Nostr workflow with relay connection management
                     viewModel.isSaving = true
                     
                     coroutineScope.launch(Dispatchers.IO) {
+                        // Verify connection health before starting
+                        try {
+                            if (!RelayConnectionManager.verifyConnectionHealth()) {
+                                println("⚠️ Relay connection health poor, attempting reconnect...")
+                                RelayConnectionManager.ensureConnected()
+                            }
+                        } catch (e: Exception) {
+                            println("⚠️ Connection check failed: ${e.message}")
+                        }
+                        
                         // Step 1: Save the meme
                         MemeFileSaver.saveMeme(
                             context = context,
@@ -510,6 +539,10 @@ fun MemeEditorScreen(
                             
                             println("🔑 Sending note to Amber for signing. Event ID: $eventId")
                             
+                            // Initialize relay tracking for this event
+                            val relayUrls = NostrRepository.relayPool.getCurrentRelays()
+                            RelayEventTracker.initializeEventTracking(eventId, relayUrls)
+                            
                             // Sign with Amber
                             val result = AmberSignerManager.signEvent(
                                 unsignedEvent.toString(),
@@ -520,13 +553,24 @@ fun MemeEditorScreen(
                                 throw Exception("Amber signing failed")
                             }
                             
-                            // Publish to relays
+                            // Publish to relays and track responses
                             val eventMessage = """["EVENT",${result.event}]"""
                             com.memely.nostr.NostrRepository.publishEvent(eventMessage)
                             
+                            // Wait for relay responses (timeout after 5 seconds)
+                            delay(5000)
+                            
+                            // Get the publish result
+                            val result_final = RelayEventTracker.getPublishResult(eventId)
+                            RelayEventTracker.completePublish(eventId)
+                            
                             coroutineScope.launch(Dispatchers.Main) {
                                 nostrPostViewModel.setSuccessState(eventId)
-                                println("✅ Posted to Nostr via Amber: $eventId")
+                                println("✅ Posted to Nostr via Amber: $eventId - ${result_final.acceptedRelays.size}/${result_final.totalRelays} relays accepted")
+                                
+                                // Show relay status
+                                publishResult = result_final
+                                showRelayStatus = true
                                 showComposeDialog = false
                                 uploadedImageUrl = null
                                 nostrPostViewModel.reset()
@@ -548,14 +592,43 @@ fun MemeEditorScreen(
                         pubkeyHex = pubkeyHex,
                         privKeyBytes = privKeyBytes,
                         coroutineScope = coroutineScope,
-                        onSuccess = { eventId ->
-                            println("✅ Posted to Nostr via nsec: $eventId")
-                            showComposeDialog = false
-                            uploadedImageUrl = null
-                            nostrPostViewModel.reset()
+                        onSuccess = { actualEventId ->
+                            println("✅ Posted to Nostr via nsec: $actualEventId")
+                            
+                            // Wait for relay responses (timeout after 5 seconds)
+                            coroutineScope.launch(Dispatchers.IO) {
+                                delay(5000)
+                                
+                                // Get the publish result
+                                val result_final = RelayEventTracker.getPublishResult(actualEventId)
+                                RelayEventTracker.completePublish(actualEventId)
+                                
+                                coroutineScope.launch(Dispatchers.Main) {
+                                    // Show relay status
+                                    publishResult = result_final
+                                    showRelayStatus = true
+                                    showComposeDialog = false
+                                    uploadedImageUrl = null
+                                    nostrPostViewModel.reset()
+                                }
+                            }
                         }
                     )
                 }
+            }
+        )
+    }
+
+    // Relay status dialog
+    if (showRelayStatus && publishResult != null) {
+        RelayStatusDialog(
+            publishResult = publishResult,
+            onDismiss = {
+                showRelayStatus = false
+            },
+            onExitEditor = {
+                // Exit the editor and return to previous screen
+                onDone(savedMemeFile?.absolutePath ?: "")
             }
         )
     }

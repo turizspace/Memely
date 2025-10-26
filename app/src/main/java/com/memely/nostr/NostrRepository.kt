@@ -9,7 +9,7 @@ object NostrRepository {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     // Start with empty list - we'll update it with proper relays
-    private val relayPool = RelayPool(emptyList())
+    val relayPool = RelayPool(emptyList())
     
     val connectedRelaysFlow: StateFlow<Int> get() = relayPool.connectedRelaysFlow
     val incomingMessagesFlow: SharedFlow<String> get() = relayPool.incomingMessagesFlow
