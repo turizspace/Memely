@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.memely.data.InteractionRepository
+import com.memely.ui.tutorial.tutorialTarget
 
 @Composable
 fun InteractionControlsBox(
@@ -52,7 +53,8 @@ fun InteractionControlsBox(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 8.dp)
+            .tutorialTarget("interaction_controls"),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

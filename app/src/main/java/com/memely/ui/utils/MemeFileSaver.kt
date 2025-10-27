@@ -14,12 +14,63 @@ import com.memely.ui.viewmodels.MemeText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
 
 object MemeFileSaver {
+    
+    /**
+     * Wraps text to fit within a maximum width by breaking it into lines at word boundaries.
+     */
+    private fun wrapText(text: String, paint: Paint, maxWidth: Float): List<String> {
+        if (maxWidth <= 0) return listOf(text)
+        
+        val lines = mutableListOf<String>()
+        
+        // First split by manual newlines
+        val paragraphs = text.split("\n")
+        
+        paragraphs.forEach { paragraph ->
+            if (paragraph.isEmpty()) {
+                lines.add("")
+                return@forEach
+            }
+            
+            val words = paragraph.split(" ")
+            var currentLine = ""
+            
+            words.forEach { word ->
+                val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
+                val testWidth = paint.measureText(testLine)
+                
+                if (testWidth <= maxWidth) {
+                    currentLine = testLine
+                } else {
+                    // Current line is full, start a new line
+                    if (currentLine.isNotEmpty()) {
+                        lines.add(currentLine)
+                    }
+                    currentLine = word
+                    
+                    // If single word is too long, we still add it (can't break further)
+                    if (paint.measureText(word) > maxWidth) {
+                        lines.add(currentLine)
+                        currentLine = ""
+                    }
+                }
+            }
+            
+            // Add the last line
+            if (currentLine.isNotEmpty()) {
+                lines.add(currentLine)
+            }
+        }
+        
+        return lines.ifEmpty { listOf(text) }
+    }
     
     private suspend fun downloadImageToCache(context: Context, url: String): Uri? {
         return try {
@@ -57,17 +108,26 @@ object MemeFileSaver {
         onSuccess: (String) -> Unit,
         onError: () -> Unit
     ) {
-        // Convert HTTPS URLs to local files first
-        val resolvedUri = runBlocking {
-            val imageUriString = imageUri.toString()
-            if (imageUriString.startsWith("http")) {
-                downloadImageToCache(context, imageUriString) ?: imageUri
+        try {
+            // For HTTP(S) URLs, try to download to cache first, but with timeout
+            val resolvedUri = if (imageUri.toString().startsWith("http")) {
+                try {
+                    runBlocking {
+                        withContext(Dispatchers.IO) {
+                            // Use timeout to prevent hanging
+                            kotlinx.coroutines.withTimeoutOrNull(5000L) {
+                                downloadImageToCache(context, imageUri.toString())
+                            } ?: imageUri
+                        }
+                    }
+                } catch (e: Exception) {
+                    println("⚠️ Failed to download image, using original URI: ${e.message}")
+                    imageUri
+                }
             } else {
                 imageUri
             }
-        }
-        
-        try {
+            
             // Get base image dimensions (use provided or decode)
             var baseWidth = originalImageWidth
             var baseHeight = originalImageHeight
@@ -154,54 +214,118 @@ object MemeFileSaver {
                 }
             }
 
-            // Draw text layers - FIXED POSITIONING
+            // Draw text layers - ACCOUNTING FOR SCALE/ROTATION TRANSFORMS
             texts.forEach { text ->
+                // Skip empty text
+                if (text.text.isBlank()) {
+                    println("⚠️ MemeFileSaver: Skipping empty text")
+                    return@forEach
+                }
+                
                 val density = context.resources.displayMetrics.density
 
-                val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                // First paint at 1x scale to measure text dimensions
+                val textPaintForMeasure = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = text.color.toArgb()
-                    // Convert sp to px, apply user scale, then scale to original image
-                    textSize = text.fontSize.value * density * text.scale * scale
+                    textSize = text.fontSize.value * density  // 1x scale for measurement
                     isFakeBoldText = true
                     style = Paint.Style.FILL
-                    textAlign = Paint.Align.LEFT // Keep LEFT alignment for precise positioning
+                    textAlign = Paint.Align.LEFT
                 }
 
                 // Account for the 8.dp padding used in TextLayerBox which shifts drawn text inside the box.
-                // Convert padding dp -> px (8.dp) into pixels using density
                 val textPaddingPx = 8f * density
 
-                // Apply position scaling, accounting for image offset and internal padding
-                val adjustedX = (text.position.x - imageOffsetX) + textPaddingPx
-                val adjustedY = (text.position.y - imageOffsetY) + textPaddingPx
-                val scaledX = adjustedX * scale
-                val scaledY = adjustedY * scale
-
-                // Log computed values for debugging alignment
-                println("🔎 MemeFileSaver text: text='${text.text}', pos=(${text.position.x},${text.position.y}), adjusted=(${adjustedX},${adjustedY}), scaled=(${scaledX},${scaledY}), textSizePx=${textPaint.textSize}, rotation=${text.rotation}")
-
-                // Split text into lines for multi-line support
-                val lines = text.text.split("\n")
+                // Calculate maximum width for text wrapping 
+                // Use a more conservative approach - don't wrap too aggressively
+                // The editor probably allows text to flow more naturally
+                val minLineWidth = textPaintForMeasure.textSize * 10f
+                val maxTextWidth = (baseImageSize.width.toFloat() * 0.8f).coerceAtLeast(minLineWidth)
                 
-                // Measure text dimensions
-                val fm = textPaint.fontMetrics
+                // Wrap text into lines based on width
+                val lines = wrapText(text.text, textPaintForMeasure, maxTextWidth)
+                
+                // Debug: Log wrapping info
+                println("🔤 Text wrapping: maxWidth=${maxTextWidth}, lines=${lines.size}, text='${text.text.take(50)}...'")
+                lines.forEachIndexed { i, line -> 
+                    val lineWidth = textPaintForMeasure.measureText(line)
+                    println("   Line $i: width=${lineWidth}, text='$line'")
+                }
+                
+                // Measure text dimensions in display space (before scaling to original image)
+                val fm = textPaintForMeasure.fontMetrics
                 val lineHeight = fm.descent - fm.ascent
-                val baselineOffset = -fm.ascent // drawText y-position to make top = 0
+                val baselineOffset = -fm.ascent
                 
-                // Calculate total text height
+                // Calculate total text height in display space
                 val totalTextHeight = lineHeight * lines.size
                 
                 // Find the widest line for rotation center calculation
-                val textWidth = lines.maxOfOrNull { line -> textPaint.measureText(line) } ?: 0f
+                val textWidth = lines.maxOfOrNull { line -> textPaintForMeasure.measureText(line) } ?: 0f
+                
+                // **COMPLEX TRANSFORM FIX: Account for text.scale AND text.rotation interaction**
+                // 
+                // In TextLayerBox, transforms are applied in this order:
+                // 1. .offset(position) - moves box to position
+                // 2. .graphicsLayer(scale, rotation) - scales and rotates around CENTER of box
+                //
+                // For the final rendered position, we need to calculate:
+                // 1. Where the top-left corner ends up after scaling around center
+                // 2. Where that scaled top-left ends up after rotation around center
+                
+                // Step 1: Calculate position after scaling (before rotation)
+                // When scaled around center, top-left shifts by (1-scale) * size / 2
+                val scaleOffsetX = (1f - text.scale) * textWidth / 2f
+                val scaleOffsetY = (1f - text.scale) * totalTextHeight / 2f
+                
+                // Step 2: Account for rotation of the scaled offset
+                // When the box is rotated, the scale offset vector also rotates
+                val rotationRad = Math.toRadians(text.rotation.toDouble()).toFloat()
+                val cosRot = kotlin.math.cos(rotationRad)
+                val sinRot = kotlin.math.sin(rotationRad)
+                
+                // Rotate the scale offset vector
+                val rotatedScaleOffsetX = scaleOffsetX * cosRot - scaleOffsetY * sinRot
+                val rotatedScaleOffsetY = scaleOffsetX * sinRot + scaleOffsetY * cosRot
+                
+                // Apply both offsets and padding
+                val adjustedX = text.position.x + rotatedScaleOffsetX + textPaddingPx
+                val adjustedY = text.position.y + rotatedScaleOffsetY + textPaddingPx
+                
+                // Now scale to original image coordinates
+                val scaledX = adjustedX * scale
+                val scaledY = adjustedY * scale
+
+                // Create final paint with full scale applied
+                val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = text.color.toArgb()
+                    textSize = textPaintForMeasure.textSize * text.scale * scale  // Apply both scales
+                    isFakeBoldText = true
+                    style = Paint.Style.FILL
+                    textAlign = Paint.Align.LEFT
+                }
+
+                // Log computed values for debugging alignment
+                println("🔎 MemeFileSaver text: text='${text.text}', pos=(${text.position.x},${text.position.y}), textDim=(${textWidth}x${totalTextHeight}), scaleOffset=(${scaleOffsetX},${scaleOffsetY}), rotatedOffset=(${rotatedScaleOffsetX},${rotatedScaleOffsetY}), adjusted=(${adjustedX},${adjustedY}), scaled=(${scaledX},${scaledY}), textScale=${text.scale}, rotation=${text.rotation}°, lines=${lines.size}, textSize=${textPaint.textSize}")
+
+                // Calculate scaled dimensions for rotation center
+                val scaledTextWidth = textWidth * text.scale * scale
+                val scaledTotalTextHeight = totalTextHeight * text.scale * scale
+
+                // Calculate the line height in the final scaled space
+                // Since we measure at 1x scale but draw at textScale * imageScale,
+                // we need to scale the line height accordingly
+                val scaledLineHeight = lineHeight * text.scale * scale
+                val scaledBaselineOffset = baselineOffset * text.scale * scale
 
                 // Draw text rotated around its center to match Compose's graphicsLayer default transform origin
                 canvas.save()
                 canvas.translate(scaledX, scaledY)
-                canvas.rotate(text.rotation, textWidth / 2f, totalTextHeight / 2f)
+                canvas.rotate(text.rotation, scaledTextWidth / 2f, scaledTotalTextHeight / 2f)
                 
-                // Draw each line
+                // Draw each line using the final paint (with full scale)
                 lines.forEachIndexed { lineIndex, line ->
-                    val lineY = lineIndex * lineHeight + baselineOffset
+                    val lineY = lineIndex * scaledLineHeight + scaledBaselineOffset
                     canvas.drawText(line, 0f, lineY, textPaint)
                 }
                 

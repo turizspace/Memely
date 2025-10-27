@@ -38,11 +38,34 @@ fun TextLayerBox(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Sync with external state changes
-    var offset by remember(text.position) { mutableStateOf(text.position) }
-    var scale by remember(text.scale) { mutableStateOf(text.scale) }
-    var rotation by remember(text.rotation) { mutableStateOf(text.rotation) }
-    var textValue by remember(text.text) { mutableStateOf(text.text) }
+    // Local state for interactive transformations
+    var offset by remember { mutableStateOf(text.position) }
+    var scale by remember { mutableStateOf(text.scale) }
+    var rotation by remember { mutableStateOf(text.rotation) }
+    var textValue by remember { mutableStateOf(text.text) }
+    
+    // Sync external changes to local state (from sliders/external updates)
+    // Only sync when values actually differ to avoid unnecessary updates
+    LaunchedEffect(text.position) {
+        if (text.position != offset) {
+            offset = text.position
+        }
+    }
+    
+    LaunchedEffect(text.scale) {
+        if (text.scale != scale) {
+            scale = text.scale
+        }
+    }
+    
+    LaunchedEffect(text.rotation) {
+        if (text.rotation != rotation) {
+            rotation = text.rotation
+        }
+    }
+    
+    // Note: textValue is NOT synced from text.text during editing
+    // to avoid interfering with user input. The text flows one way: UI -> ViewModel
 
     Box(
         modifier = modifier
@@ -57,7 +80,12 @@ fun TextLayerBox(
                 detectTransformGestures { _, pan, zoom, rotationDelta ->
                     offset += pan
                     scale = (scale * zoom).coerceIn(0.5f, 3f)
-                    rotation += rotationDelta
+                    
+                    // Normalize rotation to stay within -180° to +180° range
+                    rotation = ((rotation + rotationDelta + 180f) % 360f - 180f).let {
+                        if (it < -180f) it + 360f else it
+                    }
+                    
                     onTransformChange(offset, scale, rotation)
                     println("✏️ TextLayerBox transform idx=$index offset=$offset scale=$scale rotation=$rotation")
                 }
@@ -68,7 +96,7 @@ fun TextLayerBox(
             .padding(8.dp)
     ) {
         if (text.selected) {
-            // Editable when selected
+            // Editable when selected - support multi-line text
             BasicTextField(
                 value = textValue,
                 onValueChange = {
@@ -83,10 +111,12 @@ fun TextLayerBox(
                     fontStyle = text.fontStyle,
                     textAlign = text.textAlign
                 ),
-                modifier = Modifier.wrapContentSize()
+                modifier = Modifier.wrapContentSize(),
+                singleLine = false,
+                maxLines = Int.MAX_VALUE
             )
         } else {
-            // Display-only when not selected
+            // Display-only when not selected - support multi-line text
             Text(
                 text = text.text,
                 style = TextStyle(
@@ -97,7 +127,8 @@ fun TextLayerBox(
                     fontStyle = text.fontStyle,
                     textAlign = text.textAlign
                 ),
-                modifier = Modifier.wrapContentSize()
+                modifier = Modifier.wrapContentSize(),
+                maxLines = Int.MAX_VALUE
             )
         }
     }

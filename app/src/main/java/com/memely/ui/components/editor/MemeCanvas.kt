@@ -57,6 +57,7 @@ fun MemeCanvas(
                                 response.body?.bytes()?.let { output.write(it) }
                             }
                             localImageUri = Uri.fromFile(tempFile)
+                            viewModel.updateLocalImageUri(localImageUri) // Store in ViewModel
                             println("✅ MemeCanvas: Downloaded template to ${tempFile.absolutePath}")
                         } else {
                             println("❌ MemeCanvas: Failed to download template: ${response.code}")
@@ -66,6 +67,9 @@ fun MemeCanvas(
                     println("❌ MemeCanvas: Error downloading template: ${e.message}")
                 }
             }
+        } else {
+            // Already local, just store it
+            viewModel.updateLocalImageUri(baseImageUri)
         }
     }
     
@@ -111,7 +115,7 @@ fun MemeCanvas(
             val offsetX = (containerSize.width - displayedSize.width) / 2f
             val offsetY = (containerSize.height - displayedSize.height) / 2f
             
-            println("📐 MemeCanvas: Container=${containerSize}, Original=${originalImageWidth}x${originalImageHeight}, Displayed=${displayedSize}, Offset=(${offsetX},${offsetY})")
+            println("📐 MemeCanvas: Container=${containerSize}, Original=${originalImageWidth}x${originalImageHeight}, Displayed=${displayedSize}, Offset=(${offsetX},${offsetY}), ImageRange=[${offsetX},${offsetX + displayedSize.width}]x[${offsetY},${offsetY + displayedSize.height}]")
             
             viewModel.updateBaseImageSize(displayedSize)
             viewModel.updateImageOffset(offsetX, offsetY)

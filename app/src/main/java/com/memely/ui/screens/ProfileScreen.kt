@@ -19,6 +19,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.memely.nostr.MetadataParser
 import com.memely.ui.components.LogoutButton
+import com.memely.ui.tutorial.TutorialOverlay
+import com.memely.ui.tutorial.TutorialScreen
+import com.memely.ui.tutorial.tutorialTarget
 
 @Composable
 fun ProfileScreen(
@@ -26,99 +29,108 @@ fun ProfileScreen(
     onLogout: (() -> Unit)? = null
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.TopCenter
+        modifier = Modifier.fillMaxSize()
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.verticalScroll(rememberScrollState())
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .tutorialTarget("profile_content")
+            ) {
 
-            // Banner
-            user?.banner?.let { bannerUrl ->
-                Image(
-                    painter = rememberAsyncImagePainter(bannerUrl),
-                    contentDescription = "Banner",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp),
-                    contentScale = ContentScale.Crop
-                )
-                Spacer(Modifier.height(8.dp))
-            }
+                // Banner
+                user?.banner?.let { bannerUrl ->
+                    Image(
+                        painter = rememberAsyncImagePainter(bannerUrl),
+                        contentDescription = "Banner",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
 
-            // Avatar
-            user?.picture?.let { avatarUrl ->
-                Image(
-                    painter = rememberAsyncImagePainter(avatarUrl),
-                    contentDescription = "Profile Picture",
-                    modifier = Modifier
-                        .size(96.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-                Spacer(Modifier.height(8.dp))
-            }
+                // Avatar
+                user?.picture?.let { avatarUrl ->
+                    Image(
+                        painter = rememberAsyncImagePainter(avatarUrl),
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier
+                            .size(96.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
 
-            // Name
-            Text(
-                text = user?.name ?: "Unknown User",
-                style = MaterialTheme.typography.h6
-            )
-
-            // About
-            user?.about?.let {
-                Spacer(Modifier.height(4.dp))
+                // Name
                 Text(
-                    text = it,
-                    style = MaterialTheme.typography.body2,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            // NIP-05
-            user?.nip05?.let {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "🔹 $it",
-                    style = MaterialTheme.typography.caption
-                )
-            }
-
-            // LUD-16 (Lightning Address)
-            user?.lud16?.let {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "⚡ $it",
-                    style = MaterialTheme.typography.caption
-                )
-            }
-
-            // Website
-            user?.website?.let {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "🌐 $it",
-                    style = MaterialTheme.typography.caption
-                )
-            }
-
-            // Divider before logout section
-            if (onLogout != null) {
-                Spacer(Modifier.height(24.dp))
-                Divider(
-                    modifier = Modifier
-                        .fillMaxWidth(0.8f)
-                        .padding(vertical = 12.dp)
+                    text = user?.name ?: "Unknown User",
+                    style = MaterialTheme.typography.h6
                 )
 
-                // Logout Button Section
-                Spacer(Modifier.height(12.dp))
-                LogoutButton(onLogout = onLogout)
-                Spacer(Modifier.height(12.dp))
+                // About
+                user?.about?.let {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.body2,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                // NIP-05
+                user?.nip05?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "🔹 $it",
+                        style = MaterialTheme.typography.caption
+                    )
+                }
+
+                // LUD-16 (Lightning Address)
+                user?.lud16?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "⚡ $it",
+                        style = MaterialTheme.typography.caption
+                    )
+                }
+
+                // Website
+                user?.website?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "🌐 $it",
+                        style = MaterialTheme.typography.caption
+                    )
+                }
+
+                // Divider before logout section
+                if (onLogout != null) {
+                    Spacer(Modifier.height(24.dp))
+                    Divider(
+                        modifier = Modifier
+                            .fillMaxWidth(0.8f)
+                            .padding(vertical = 12.dp)
+                    )
+
+                    // Logout Button Section
+                    Spacer(Modifier.height(12.dp))
+                    LogoutButton(onLogout = onLogout)
+                    Spacer(Modifier.height(12.dp))
+                }
             }
         }
+        
+        // Tutorial overlay for Profile screen
+        TutorialOverlay(currentScreen = TutorialScreen.PROFILE)
     }
 }

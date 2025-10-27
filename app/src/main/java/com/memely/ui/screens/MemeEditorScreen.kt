@@ -29,6 +29,7 @@ import com.memely.ui.components.editor.EditorControls
 import com.memely.ui.components.editor.MemeCanvas
 import com.memely.ui.components.editor.TextFormattingPanel
 import com.memely.ui.components.editor.ImageEditingPanel
+import com.memely.ui.components.editor.TemplateSelectorDialog
 import com.memely.ui.utils.MemeFileSaver
 import com.memely.ui.viewmodels.MemeEditorViewModel
 import androidx.compose.ui.text.TextStyle
@@ -48,12 +49,17 @@ import com.memely.nostr.RelayConnectionManager
 import com.memely.nostr.PublishResult
 import kotlinx.coroutines.delay
 import java.io.File
+import com.memely.ui.tutorial.TutorialOverlay
+import com.memely.ui.tutorial.TutorialScreen
+import com.memely.ui.tutorial.TutorialTargetRegistry
+import com.memely.ui.tutorial.tutorialTarget
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun MemeEditorScreen(
     imageUri: Uri,
-    onDone: (savedPath: String) -> Unit
+    onDone: (savedPath: String) -> Unit,
+    onNavigateToHomeFeed: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -94,6 +100,7 @@ fun MemeEditorScreen(
     var showComposeDialog by remember { mutableStateOf(false) }
     var showTextFormattingPanel by remember { mutableStateOf(false) }
     var showImageEditingPanel by remember { mutableStateOf(false) }
+    var showTemplateSelector by remember { mutableStateOf(false) }
     var isSavingToDevice by remember { mutableStateOf(false) }
     var uploadedImageUrl by remember { mutableStateOf<String?>(null) }
     var savedMemeFile by remember { mutableStateOf<File?>(null) }
@@ -153,244 +160,260 @@ fun MemeEditorScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            // Title bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Meme Editor", style = MaterialTheme.typography.h5)
-                IconButton(onClick = {
-                    onDone("")
-                }) {
-                    Icon(Icons.Default.Close, contentDescription = "Close Editor")
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                // Title bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Meme Editor", style = MaterialTheme.typography.h5)
+                    IconButton(onClick = {
+                        onDone("")
+                    }) {
+                        Icon(Icons.Default.Close, contentDescription = "Close Editor")
+                    }
                 }
-            }
-        },
-        bottomBar = {
-            EditorControls(
-                canAddText = true,
-                onAddText = {
-                    // Add text at center of the displayed image (accounting for offset)
-                    val centerX = viewModel.imageOffsetX + (viewModel.baseImageSize.width / 2f)
-                    val centerY = viewModel.imageOffsetY + (viewModel.baseImageSize.height / 2f)
+            },
+            bottomBar = {
+                EditorControls(
+                    canAddText = true,
+                    onAddText = {
+                        // Add text at center of the displayed image (accounting for offset)
+                        val centerX = viewModel.imageOffsetX + (viewModel.baseImageSize.width / 2f)
+                        val centerY = viewModel.imageOffsetY + (viewModel.baseImageSize.height / 2f)
 
-                    // Account for the 8.dp padding used inside TextLayerBox so stored top-left
-                    // results in the visible text content appearing at the center.
-                    viewModel.addText(
-                        androidx.compose.ui.geometry.Offset(
-                            centerX - textPaddingPx,
-                            centerY - textPaddingPx
+                        // Account for the 8.dp padding used inside TextLayerBox so stored top-left
+                        // results in the visible text content appearing at the center.
+                        viewModel.addText(
+                            androidx.compose.ui.geometry.Offset(
+                                centerX - textPaddingPx,
+                                centerY - textPaddingPx
+                            )
                         )
-                    )
-                },
-                onAddImage = {
-                    overlayLauncher.launch("image/*")
-                },
-                canChangeColor = viewModel.selectedIsText && viewModel.selectedLayerIndex != null,
-                onChangeColor = {
-                    showColorPicker = true
-                },
-                canDelete = viewModel.selectedLayerIndex != null,
-                onDelete = {
-                    viewModel.deleteSelected()
-                },
-                isSaving = viewModel.isSaving,
-                onSave = {
-                    viewModel.isSaving = true
-                    coroutineScope.launch(Dispatchers.IO) {
-                        MemeFileSaver.saveMeme(
-                            context = context,
-                            imageUri = imageUri,
-                            texts = viewModel.texts,
-                            overlays = viewModel.overlays,
-                            baseImageSize = viewModel.baseImageSize,
-                            originalImageWidth = viewModel.originalImageWidth,
-                            originalImageHeight = viewModel.originalImageHeight,
-                            imageOffsetX = viewModel.imageOffsetX,
-                            imageOffsetY = viewModel.imageOffsetY,
-                            onSuccess = { path ->
-                                coroutineScope.launch(Dispatchers.Main) {
-                                    viewModel.isSaving = false
-                                    onDone(path)
+                    },
+                    onAddImage = {
+                        overlayLauncher.launch("image/*")
+                    },
+                    onNavigateToHomeFeed = {
+                        // Show template selector dialog to add template as layer
+                        showTemplateSelector = true
+                    },
+                    canChangeColor = viewModel.selectedIsText && viewModel.selectedLayerIndex != null,
+                    onChangeColor = {
+                        showColorPicker = true
+                    },
+                    canDelete = viewModel.selectedLayerIndex != null,
+                    onDelete = {
+                        viewModel.deleteSelected()
+                    },
+                    isSaving = viewModel.isSaving,
+                    onSave = {
+                        viewModel.isSaving = true
+                        coroutineScope.launch(Dispatchers.IO) {
+                            MemeFileSaver.saveMeme(
+                                context = context,
+                                imageUri = viewModel.localImageUri ?: imageUri, // Use cached local URI if available
+                                texts = viewModel.texts,
+                                overlays = viewModel.overlays,
+                                baseImageSize = viewModel.baseImageSize,
+                                originalImageWidth = viewModel.originalImageWidth,
+                                originalImageHeight = viewModel.originalImageHeight,
+                                imageOffsetX = viewModel.imageOffsetX,
+                                imageOffsetY = viewModel.imageOffsetY,
+                                onSuccess = { path ->
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        viewModel.isSaving = false
+                                        onDone(path)
+                                    }
+                                },
+                                onError = {
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        viewModel.isSaving = false
+                                        onDone("")
+                                    }
                                 }
-                            },
-                            onError = {
-                                coroutineScope.launch(Dispatchers.Main) {
-                                    viewModel.isSaving = false
-                                    onDone("")
-                                }
-                            }
-                        )
-                    }
-                },
-                onPostToNostr = {
-                    // Start the Post to Nostr workflow with relay connection management
-                    viewModel.isSaving = true
-                    
-                    coroutineScope.launch(Dispatchers.IO) {
-                        // Verify connection health before starting
-                        try {
-                            if (!RelayConnectionManager.verifyConnectionHealth()) {
-                                println("⚠️ Relay connection health poor, attempting reconnect...")
-                                RelayConnectionManager.ensureConnected()
-                            }
-                        } catch (e: Exception) {
-                            println("⚠️ Connection check failed: ${e.message}")
+                            )
                         }
+                    },
+                    onPostToNostr = {
+                        // Start the Post to Nostr workflow with relay connection management
+                        viewModel.isSaving = true
                         
-                        // Step 1: Save the meme
-                        MemeFileSaver.saveMeme(
-                            context = context,
-                            imageUri = imageUri,
-                            texts = viewModel.texts,
-                            overlays = viewModel.overlays,
-                            baseImageSize = viewModel.baseImageSize,
-                            originalImageWidth = viewModel.originalImageWidth,
-                            originalImageHeight = viewModel.originalImageHeight,
-                            imageOffsetX = viewModel.imageOffsetX,
-                            imageOffsetY = viewModel.imageOffsetY,
-                            onSuccess = { path ->
-                                coroutineScope.launch(Dispatchers.Main) {
-                                    viewModel.isSaving = false
-                                    savedMemeFile = File(path)
-                                    
-                                    // Step 2: Upload to Blossom
-                                    val pubkeyHex = KeyStoreManager.getPubkeyHex()
-                                    val isUsingAmber = KeyStoreManager.isUsingAmber()
-                                    val privKeyHex = if (!isUsingAmber) KeyStoreManager.exportNsecHex() else null
-                                    
-                                    if (pubkeyHex.isNullOrBlank()) {
-                                        println("❌ No pubkey available")
-                                        // TODO: Show error to user
-                                        return@launch
-                                    }
-                                    
-                                    if (!isUsingAmber && privKeyHex.isNullOrBlank()) {
-                                        println("❌ No private key available and not using Amber")
-                                        // TODO: Show error to user
-                                        return@launch
-                                    }
-                                    
-                                    println("🔑 Authentication: ${if (isUsingAmber) "Amber" else "nsec"}")
-                                    
-                                    blossomViewModel.uploadFile(
-                                        file = File(path),
-                                        contentType = "image/jpeg",
-                                        pubkeyHex = pubkeyHex,
-                                        signEventFunc = { eventJson ->
-                                            if (isUsingAmber) {
-                                                // Calculate event ID from unsigned event
-                                                val eventId = NostrEventSigner.calculateEventId(eventJson)
-                                                
-                                                // Add the ID to the event JSON before sending to Amber
-                                                val jsonObj = org.json.JSONObject(eventJson)
-                                                jsonObj.put("id", eventId)
-                                                val eventWithId = jsonObj.toString()
-                                                
-                                                println("🔑 Sending event to Amber for signing. Event ID: $eventId")
-                                                
-                                                try {
-                                                    val result = AmberSignerManager.signEvent(eventWithId, eventId)
-                                                    if (result.event.isNullOrBlank()) {
-                                                        throw Exception("Amber did not return a signed event")
-                                                    }
-                                                    println("✅ Amber signing successful")
-                                                    result.event
-                                                } catch (e: Exception) {
-                                                    println("❌ Amber signing error: ${e.message}")
-                                                    throw e
-                                                }
-                                            } else {
-                                                // Use local nsec to sign
-                                                val privKeyBytes = privKeyHex!!.hexToBytes()
-                                                val jsonObj = org.json.JSONObject(eventJson)
-                                                NostrEventSigner.signEvent(
-                                                    kind = 24242,
-                                                    content = jsonObj.optString("content", ""),
-                                                    tags = jsonObj.optJSONArray("tags")?.let { arr ->
-                                                        (0 until arr.length()).map { i ->
-                                                            val tagArr = arr.getJSONArray(i)
-                                                            (0 until tagArr.length()).map { j ->
-                                                                tagArr.getString(j)
-                                                            }
-                                                        }
-                                                    } ?: emptyList(),
-                                                    pubkeyHex = pubkeyHex,
-                                                    privKeyBytes = privKeyBytes
-                                                )
-                                            }
-                                        },
-                                        coroutineScope = coroutineScope,
-                                        onSuccess = { url ->
-                                            // Step 3: Show compose dialog
-                                            uploadedImageUrl = url
-                                            showComposeDialog = true
+                        coroutineScope.launch(Dispatchers.IO) {
+                            // Verify connection health before starting
+                            try {
+                                if (!RelayConnectionManager.verifyConnectionHealth()) {
+                                    println("⚠️ Relay connection health poor, attempting reconnect...")
+                                    RelayConnectionManager.ensureConnected()
+                            }
+                            } catch (e: Exception) {
+                                println("⚠️ Connection check failed: ${e.message}")
+                            }
+                            
+                            // Step 1: Save the meme
+                            MemeFileSaver.saveMeme(
+                                context = context,
+                                imageUri = viewModel.localImageUri ?: imageUri, // Use cached local URI if available
+                                texts = viewModel.texts,
+                                overlays = viewModel.overlays,
+                                baseImageSize = viewModel.baseImageSize,
+                                originalImageWidth = viewModel.originalImageWidth,
+                                originalImageHeight = viewModel.originalImageHeight,
+                                imageOffsetX = viewModel.imageOffsetX,
+                                imageOffsetY = viewModel.imageOffsetY,
+                                onSuccess = { path ->
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        viewModel.isSaving = false
+                                        savedMemeFile = File(path)
+                                        
+                                        // Step 2: Upload to Blossom
+                                        val pubkeyHex = KeyStoreManager.getPubkeyHex()
+                                        val isUsingAmber = KeyStoreManager.isUsingAmber()
+                                        val privKeyHex = if (!isUsingAmber) KeyStoreManager.exportNsecHex() else null
+                                        
+                                        if (pubkeyHex.isNullOrBlank()) {
+                                            println("❌ No pubkey available")
+                                            // TODO: Show error to user
+                                            return@launch
                                         }
-                                    )
+                                        
+                                        if (!isUsingAmber && privKeyHex.isNullOrBlank()) {
+                                            println("❌ No private key available and not using Amber")
+                                            // TODO: Show error to user
+                                            return@launch
+                                        }
+                                        
+                                        println("🔑 Authentication: ${if (isUsingAmber) "Amber" else "nsec"}")
+                                        
+                                        blossomViewModel.uploadFile(
+                                            file = File(path),
+                                            contentType = "image/jpeg",
+                                            pubkeyHex = pubkeyHex,
+                                            signEventFunc = { eventJson ->
+                                                if (isUsingAmber) {
+                                                    // Calculate event ID from unsigned event
+                                                    val eventId = NostrEventSigner.calculateEventId(eventJson)
+                                                    
+                                                    // Add the ID to the event JSON before sending to Amber
+                                                    val jsonObj = org.json.JSONObject(eventJson)
+                                                    jsonObj.put("id", eventId)
+                                                    val eventWithId = jsonObj.toString()
+                                                    
+                                                    println("🔑 Sending event to Amber for signing. Event ID: $eventId")
+                                                    
+                                                    try {
+                                                        val result = AmberSignerManager.signEvent(eventWithId, eventId)
+                                                        if (result.event.isNullOrBlank()) {
+                                                            throw Exception("Amber did not return a signed event")
+                                                        }
+                                                        println("✅ Amber signing successful")
+                                                        result.event
+                                                    } catch (e: Exception) {
+                                                        println("❌ Amber signing error: ${e.message}")
+                                                        throw e
+                                                    }
+                                                } else {
+                                                    // Use local nsec to sign
+                                                    val privKeyBytes = privKeyHex!!.hexToBytes()
+                                                    val jsonObj = org.json.JSONObject(eventJson)
+                                                    NostrEventSigner.signEvent(
+                                                        kind = 24242,
+                                                        content = jsonObj.optString("content", ""),
+                                                        tags = jsonObj.optJSONArray("tags")?.let { arr ->
+                                                            (0 until arr.length()).map { i ->
+                                                                val tagArr = arr.getJSONArray(i)
+                                                                (0 until tagArr.length()).map { j ->
+                                                                    tagArr.getString(j)
+                                                                }
+                                                            }
+                                                        } ?: emptyList(),
+                                                        pubkeyHex = pubkeyHex,
+                                                        privKeyBytes = privKeyBytes
+                                                    )
+                                                }
+                                            },
+                                            coroutineScope = coroutineScope,
+                                            onSuccess = { url ->
+                                                // Step 3: Show compose dialog
+                                                uploadedImageUrl = url
+                                                showComposeDialog = true
+                                            }
+                                        )
+                                    }
+                                },
+                                onError = {
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        viewModel.isSaving = false
+                                        println("❌ Failed to save meme")
+                                    }
                                 }
-                            },
-                            onError = {
-                                coroutineScope.launch(Dispatchers.Main) {
-                                    viewModel.isSaving = false
-                                    println("❌ Failed to save meme")
+                            )
+                        }
+                    },
+                    isPostingToNostr = viewModel.isSaving || isUploadingToBlossom,
+                    onSaveToDevice = {
+                        isSavingToDevice = true
+                        coroutineScope.launch(Dispatchers.IO) {
+                            MemeFileSaver.saveMeme(
+                                context = context,
+                                imageUri = viewModel.localImageUri ?: imageUri, // Use cached local URI if available
+                                texts = viewModel.texts,
+                                overlays = viewModel.overlays,
+                                baseImageSize = viewModel.baseImageSize,
+                                originalImageWidth = viewModel.originalImageWidth,
+                                originalImageHeight = viewModel.originalImageHeight,
+                                imageOffsetX = viewModel.imageOffsetX,
+                                imageOffsetY = viewModel.imageOffsetY,
+                                onSuccess = { path ->
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        isSavingToDevice = false
+                                        println("✅ Meme saved to: $path")
+                                    }
+                                },
+                                onError = {
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        isSavingToDevice = false
+                                        println("❌ Failed to save meme")
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
+                    },
+                    isSavingToDevice = isSavingToDevice,
+                    onShowTextFormatting = { showTextFormattingPanel = true },
+                    onShowImageEditing = { showImageEditingPanel = true },
+                    selectedIsText = viewModel.selectedIsText && viewModel.selectedLayerIndex != null,
+                    selectedIsImage = !viewModel.selectedIsText && viewModel.selectedLayerIndex != null,
+                    onGloballyPositioned = {
+                        // When the controls are laid out, re-register all tutorial targets
+                        // to ensure their positions are correctly captured.
+                        TutorialTargetRegistry.repositionAllTargets()
                     }
-                },
-                isPostingToNostr = viewModel.isSaving || isUploadingToBlossom,
-                onSaveToDevice = {
-                    isSavingToDevice = true
-                    coroutineScope.launch(Dispatchers.IO) {
-                        MemeFileSaver.saveMeme(
-                            context = context,
-                            imageUri = imageUri,
-                            texts = viewModel.texts,
-                            overlays = viewModel.overlays,
-                            baseImageSize = viewModel.baseImageSize,
-                            originalImageWidth = viewModel.originalImageWidth,
-                            originalImageHeight = viewModel.originalImageHeight,
-                            imageOffsetX = viewModel.imageOffsetX,
-                            imageOffsetY = viewModel.imageOffsetY,
-                            onSuccess = { path ->
-                                coroutineScope.launch(Dispatchers.Main) {
-                                    isSavingToDevice = false
-                                    println("✅ Meme saved to: $path")
-                                }
-                            },
-                            onError = {
-                                coroutineScope.launch(Dispatchers.Main) {
-                                    isSavingToDevice = false
-                                    println("❌ Failed to save meme")
-                                }
-                            }
-                        )
-                    }
-                },
-                isSavingToDevice = isSavingToDevice,
-                onShowTextFormatting = { showTextFormattingPanel = true },
-                onShowImageEditing = { showImageEditingPanel = true },
-                selectedIsText = viewModel.selectedIsText && viewModel.selectedLayerIndex != null,
-                selectedIsImage = !viewModel.selectedIsText && viewModel.selectedLayerIndex != null
-            )
+                )
+            }
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                MemeCanvas(
+                    baseImageUri = imageUri,
+                    viewModel = viewModel,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .tutorialTarget("meme_canvas")
+                )
+            }
         }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            MemeCanvas(
-                baseImageUri = imageUri,
-                viewModel = viewModel,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+
+        // Tutorial overlay for Meme Editor - placed outside Scaffold to see all targets
+        TutorialOverlay(currentScreen = TutorialScreen.MEME_EDITOR)
     }
 
     // Color picker dialog
@@ -629,6 +652,71 @@ fun MemeEditorScreen(
             onExitEditor = {
                 // Exit the editor and return to previous screen
                 onDone(savedMemeFile?.absolutePath ?: "")
+            }
+        )
+    }
+
+    // Template selector dialog for adding templates as layers
+    if (showTemplateSelector) {
+        TemplateSelectorDialog(
+            onDismiss = { showTemplateSelector = false },
+            onTemplateSelected = { templateUri ->
+                coroutineScope.launch(Dispatchers.IO) {
+                    try {
+                        // Check if it's a network URL or local content URI
+                        val isNetworkUrl = templateUri.scheme == "http" || templateUri.scheme == "https"
+                        
+                        val dimensions = if (isNetworkUrl) {
+                            // For network URLs, use default dimensions (Coil will handle actual loading)
+                            // Most meme templates are roughly 500x500 to 1000x1000
+                            Pair(800, 800)
+                        } else {
+                            // For local content URIs, get actual dimensions
+                            val inputStream = context.contentResolver.openInputStream(templateUri)
+                            val options = android.graphics.BitmapFactory.Options().apply {
+                                inJustDecodeBounds = true
+                            }
+                            android.graphics.BitmapFactory.decodeStream(inputStream, null, options)
+                            inputStream?.close()
+                            Pair(options.outWidth, options.outHeight)
+                        }
+
+                        coroutineScope.launch(Dispatchers.Main) {
+                            // Calculate initial position centered on canvas
+                            val defaultDisplayDpValue = MemeOverlayImage(
+                                uri = templateUri,
+                                originalWidth = dimensions.first,
+                                originalHeight = dimensions.second,
+                                position = androidx.compose.ui.geometry.Offset(0f, 0f)
+                            ).displayWidth.value
+
+                            val displayWidthPx = defaultDisplayDpValue * screenDensity
+
+                            val centerX = viewModel.imageOffsetX + (viewModel.baseImageSize.width / 2f)
+                            val centerY = viewModel.imageOffsetY + (viewModel.baseImageSize.height / 2f)
+
+                            val initialX = centerX - (displayWidthPx / 2f)
+                            val displayHeightPx = displayWidthPx * (dimensions.second.toFloat() / dimensions.first.toFloat())
+                            val initialY = centerY - (displayHeightPx / 2f)
+
+                            // Add template as overlay layer
+                            viewModel.addOverlay(
+                                templateUri,
+                                dimensions.first,
+                                dimensions.second,
+                                androidx.compose.ui.geometry.Offset(initialX, initialY)
+                            )
+                            
+                            showTemplateSelector = false
+                        }
+                    } catch (e: Exception) {
+                        println("❌ Error adding template: ${e.message}")
+                        e.printStackTrace()
+                        coroutineScope.launch(Dispatchers.Main) {
+                            showTemplateSelector = false
+                        }
+                    }
+                }
             }
         )
     }

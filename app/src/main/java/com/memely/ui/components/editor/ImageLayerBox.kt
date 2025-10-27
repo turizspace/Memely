@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,10 +36,30 @@ fun ImageLayerBox(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Sync with external state changes
-    var offset by remember(overlay.position) { mutableStateOf(overlay.position) }
-    var scale by remember(overlay.scale) { mutableStateOf(overlay.scale) }
-    var rotation by remember(overlay.rotation) { mutableStateOf(overlay.rotation) }
+    // Local state for interactive transformations
+    var offset by remember { mutableStateOf(overlay.position) }
+    var scale by remember { mutableStateOf(overlay.scale) }
+    var rotation by remember { mutableStateOf(overlay.rotation) }
+    
+    // Sync external changes to local state (from sliders/external updates)
+    // Only sync when values actually differ to avoid unnecessary updates
+    LaunchedEffect(overlay.position) {
+        if (overlay.position != offset) {
+            offset = overlay.position
+        }
+    }
+    
+    LaunchedEffect(overlay.scale) {
+        if (overlay.scale != scale) {
+            scale = overlay.scale
+        }
+    }
+    
+    LaunchedEffect(overlay.rotation) {
+        if (overlay.rotation != rotation) {
+            rotation = overlay.rotation
+        }
+    }
 
     // Calculate aspect ratio preserving size
     val aspectRatio = overlay.originalWidth.toFloat() / overlay.originalHeight.toFloat()
@@ -62,7 +83,12 @@ fun ImageLayerBox(
                 detectTransformGestures { _, pan, zoom, rotationDelta ->
                     offset += pan
                     scale = (scale * zoom).coerceIn(0.5f, 3f)
-                    rotation += rotationDelta
+                    
+                    // Normalize rotation to stay within -180° to +180° range
+                    rotation = ((rotation + rotationDelta + 180f) % 360f - 180f).let {
+                        if (it < -180f) it + 360f else it
+                    }
+                    
                     onTransformChange(offset, scale, rotation)
                     println("🖼 ImageLayerBox transform idx=$index offset=$offset scale=$scale rotation=$rotation")
                 }

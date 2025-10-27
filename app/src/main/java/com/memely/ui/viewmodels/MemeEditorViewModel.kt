@@ -53,9 +53,14 @@ class MemeEditorViewModel {
     var originalImageHeight by mutableStateOf(0) // Original image height
     var imageOffsetX by mutableStateOf(0f) // Offset from left edge when centered
     var imageOffsetY by mutableStateOf(0f) // Offset from top edge when centered
+    var localImageUri by mutableStateOf<Uri?>(null) // Cached local URI for remote images
 
     fun updateBaseImageSize(size: IntSize) {
         baseImageSize = size
+    }
+    
+    fun updateLocalImageUri(uri: Uri) {
+        localImageUri = uri
     }
 
     fun updateOriginalImageSize(width: Int, height: Int) {

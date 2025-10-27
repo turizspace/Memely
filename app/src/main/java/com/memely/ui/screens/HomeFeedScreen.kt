@@ -17,6 +17,10 @@ import androidx.compose.ui.unit.dp
 import com.memely.data.TemplateRepository
 import com.memely.ui.components.SearchBar
 import com.memely.ui.components.TemplateGrid
+import com.memely.ui.tutorial.TutorialOverlay
+import com.memely.ui.tutorial.TutorialScreen
+import com.memely.ui.tutorial.TutorialManager
+import com.memely.ui.tutorial.tutorialTarget
 
 @Composable
 fun HomeFeedScreen(
@@ -37,36 +41,57 @@ fun HomeFeedScreen(
         TemplateRepository.fetchTemplates()
     }
     
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(8.dp)
-    ) {
-        // Search bar
-        SearchBar(
-            query = searchQuery,
-            onQueryChanged = { searchQuery = it },
-            placeholder = "Search templates...",
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-        
-        // Template grid
-        Box(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(8.dp)
+                .tutorialTarget("home_screen")
         ) {
-            TemplateGrid(
-                templates = filteredTemplates,
-                isLoading = isLoading,
-                error = error,
-                modifier = Modifier.fillMaxSize(),
-                onTemplateClick = { template ->
-                    println("🎨 HomeFeedScreen: Selected template - ${template.name}")
-                    // Convert template URL to Uri and pass to editor
-                    val templateUri = Uri.parse("https://turiz.space" + template.url)
-                    onTemplateSelected(templateUri)
-                }
+            // Search bar
+            SearchBar(
+                query = searchQuery,
+                onQueryChanged = { searchQuery = it },
+                placeholder = "Search templates...",
+                modifier = Modifier
+                    .padding(bottom = 12.dp)
+                    .tutorialTarget("search_bar")
             )
+            
+            // Template grid
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .tutorialTarget("template_grid")
+            ) {
+                TemplateGrid(
+                    templates = filteredTemplates,
+                    isLoading = isLoading,
+                    error = error,
+                    modifier = Modifier.fillMaxSize(),
+                    onTemplateClick = { template ->
+                        println("🎨 HomeFeedScreen: Selected template - ${template.name}")
+                        
+                        // Check if tutorial is active and waiting for template selection
+                        val currentStep = TutorialManager.getCurrentStep()
+                        val isActive = TutorialManager.isActive.value
+                        
+                        if (isActive && currentStep?.id == "home_select_template" && currentStep.actionRequired) {
+                            // Advance tutorial when template is selected during tutorial
+                            TutorialManager.nextStep()
+                            // Don't navigate to editor yet during tutorial
+                            return@TemplateGrid
+                        }
+                        
+                        // Normal behavior: Convert template URL to Uri and pass to editor
+                        val templateUri = Uri.parse("https://turiz.space" + template.url)
+                        onTemplateSelected(templateUri)
+                    }
+                )
+            }
         }
+        
+        // Tutorial overlay for Home screen
+        TutorialOverlay(currentScreen = TutorialScreen.HOME_FEED)
     }
 }

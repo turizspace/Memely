@@ -9,18 +9,22 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
+import com.memely.data.TemplateRepository
 import com.memely.nostr.*
 import com.memely.ui.components.BottomBar
 import com.memely.ui.components.UserTopBar
 import com.memely.ui.screens.*
+import com.memely.ui.tutorial.TutorialManager
 
 class MainActivity : ComponentActivity() {
 
@@ -74,21 +78,52 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppRoot(openUrl: (Intent) -> Unit) {
+    val context = LocalContext.current
     var loggedIn by remember { mutableStateOf(KeyStoreManager.hasKey()) }
+    var isInitialized by remember { mutableStateOf(false) }
+    
+    // Initialize TutorialManager
+    LaunchedEffect(Unit) {
+        TutorialManager.initialize(context)
+        isInitialized = true
+    }
+    
+    // Start tutorial if user is logged in and hasn't completed it
+    LaunchedEffect(loggedIn) {
+        if (loggedIn && TutorialManager.shouldShowTutorial()) {
+            TutorialManager.startTutorial()
+        }
+    }
 
-    if (!loggedIn) {
-        LoginScreen(
-            onLoggedIn = { loggedIn = true },
-            openUrl = openUrl
-        )
-    } else {
-        AuthenticatedRoot(
-            onLogout = {
-                // Clear all stored keys and credentials
-                KeyStoreManager.clear()
-                loggedIn = false
-            }
-        )
+    // Wait for initialization before showing any screen
+    if (!isInitialized) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    when {
+        !loggedIn -> {
+            LoginScreen(
+                onLoggedIn = { 
+                    loggedIn = true
+                },
+                openUrl = openUrl
+            )
+        }
+        else -> {
+            AuthenticatedRoot(
+                onLogout = {
+                    // Clear all stored keys and credentials
+                    KeyStoreManager.clear()
+                    loggedIn = false
+                }
+            )
+        }
     }
 }
 
@@ -100,6 +135,49 @@ fun AuthenticatedRoot(onLogout: () -> Unit = {}) {
     
     // Shared state for meme editor image URI - avoids navigation encoding issues
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    
+    // Get available templates for tutorial
+    val availableTemplates by TemplateRepository.templatesFlow.collectAsState()
+    
+    // Set up tutorial navigation callback
+    LaunchedEffect(Unit) {
+        TutorialManager.onNavigationRequired = { action ->
+            when (action) {
+                "navigate_to_editor" -> {
+                    // Select first available template and navigate to editor
+                    if (availableTemplates.isNotEmpty()) {
+                        val randomTemplate = availableTemplates.first()
+                        selectedImageUri = Uri.parse(randomTemplate.url)
+                        navController.navigate("meme_editor")
+                    }
+                }
+                "navigate_to_home" -> {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+                "navigate_to_explore" -> {
+                    navController.navigate("explore") {
+                        popUpTo("home") { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+                "navigate_to_upload" -> {
+                    navController.navigate("upload") {
+                        popUpTo("home") { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+                "navigate_to_profile" -> {
+                    navController.navigate("profile") {
+                        popUpTo("home") { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+            }
+        }
+    }
     
     // Only show bottom bar for main tabs, not for meme editor
     val showBottomBar = when (currentRoute) {
@@ -244,6 +322,12 @@ fun AuthenticatedRoot(onLogout: () -> Unit = {}) {
                             // Navigate back to home screen
                             selectedImageUri = null
                             navController.popBackStack()
+                        },
+                        onNavigateToHomeFeed = {
+                            // Navigate back to home feed for template selection
+                            navController.navigate("home") {
+                                popUpTo("home") { inclusive = true }
+                            }
                         }
                     )
                 }
