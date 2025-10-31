@@ -9,6 +9,9 @@
     <application
         android:name=".MemelyApp"
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/backup_rules"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:label="Memely"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.AppCompat.DayNight">

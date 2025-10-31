@@ -1,5 +1,6 @@
 package com.memely.data
 
+import com.memely.network.SecureHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +20,7 @@ data class MemeTemplate(
 )
 
 object TemplateRepository {
-    private val httpClient = OkHttpClient()
+    private val httpClient = SecureHttpClient.createDownloadClient()
     
     private val _templatesFlow = MutableStateFlow<List<MemeTemplate>>(emptyList())
     val templatesFlow: StateFlow<List<MemeTemplate>> = _templatesFlow

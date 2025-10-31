@@ -3,6 +3,9 @@ package com.memely.ui.components
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.DropdownMenu
@@ -173,11 +176,43 @@ fun NoteActionsMenu(
 }
 
 /**
- * Helper function to copy text to clipboard and show toast
+ * Helper function to copy sensitive text (pubkeys/npubs) to clipboard with security measures
+ * - Marks data as sensitive on Android 13+ to prevent clipboard history sync
+ * - Auto-clears clipboard after 60 seconds
+ * - Shows user warning about clipboard access
  */
 private fun copyToClipboard(context: Context, text: String, message: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val clip = ClipData.newPlainText("label", text)
+    val clip = ClipData.newPlainText("Sensitive Data", text)
+    
+    // Mark as sensitive on Android 13+ (API 33+) to prevent history/sync
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        try {
+            val extras = android.os.PersistableBundle().apply {
+                putBoolean("android.content.extra.IS_SENSITIVE", true)
+            }
+            clip.description.extras = extras
+        } catch (e: Exception) {
+            // Fallback if extras not supported
+        }
+    }
+    
     clipboard.setPrimaryClip(clip)
-    AndroidToast.makeText(context, message, AndroidToast.LENGTH_SHORT).show()
+    
+    // Show toast warning that data was copied
+    AndroidToast.makeText(
+        context,
+        "$message (will be cleared in 60s)",
+        AndroidToast.LENGTH_LONG
+    ).show()
+    
+    // Auto-clear clipboard after 60 seconds to prevent unauthorized access
+    Handler(Looper.getMainLooper()).postDelayed({
+        try {
+            val emptyClip = ClipData.newPlainText("", "")
+            clipboard.setPrimaryClip(emptyClip)
+        } catch (e: Exception) {
+            // Silently fail if unable to clear
+        }
+    }, 60_000)  // 60 seconds
 }

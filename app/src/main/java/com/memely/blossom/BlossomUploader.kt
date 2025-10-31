@@ -1,6 +1,7 @@
 package com.memely.blossom
 
 import android.util.Base64
+import com.memely.network.SecureHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -16,10 +17,12 @@ import java.security.MessageDigest
 /**
  * Minimal Blossom client for authenticated media uploads using NIP-98 (Blossom Upload Descriptor).
  * Supports SHA-256 file hashing and signed authorization events.
+ * 
+ * Security: Uses SecureHttpClient for secure uploads.
  */
 class BlossomClient(
     val baseUrl: String = BlossomConfig.baseUrl,
-    private val http: OkHttpClient = OkHttpClient()
+    private val http: OkHttpClient = SecureHttpClient.createDownloadClient()
 ) {
 
     data class UploadResult(val ok: Boolean, val statusCode: Int, val body: String?)

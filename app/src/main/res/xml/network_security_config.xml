@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Base configuration: Block all cleartext (HTTP) traffic by default -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust system CA certificates -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    
+    <!-- Debug overrides for development (only active in debug builds) -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+    
+    <!-- 
+    Domain-specific configurations can be added here
+    Example for specific relay with cleartext (NOT RECOMMENDED):
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+    -->
+</network-security-config>

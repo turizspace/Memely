@@ -1,6 +1,7 @@
 package com.memely.nostr
 
 import android.content.Intent
+import com.memely.util.SecureLog
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
@@ -8,6 +9,8 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * AmberSignerManager — handles communication with external Nostr signer apps (Amber/Quartz).
  * Supports getting pubkey and signing events (NIP-46 compatible).
+ * 
+ * Security: All sensitive data logging has been removed or sanitized.
  */
 object AmberSignerManager {
     private var externalPubkey: String? = null
@@ -34,17 +37,51 @@ object AmberSignerManager {
 
     fun handleIntentResponse(intent: Intent) {
         try {
+            // Security: Validate intent extras before processing
             val id = intent.getStringExtra("id")
             val result = intent.getStringExtra("result")
             val event = intent.getStringExtra("event")
             val pkg = intent.getStringExtra("package")
+            
+            // Validate ID exists and is expected
+            if (id.isNullOrBlank()) {
+                SecureLog.w("Received intent with no ID - ignoring")
+                return
+            }
+            
+            // Validate result format if present
+            if (result != null && result.length > 10000) {
+                SecureLog.w("Received intent with suspiciously large result - ignoring")
+                return
+            }
+            
+            // Validate event JSON structure if present
+            if (event != null) {
+                try {
+                    org.json.JSONObject(event) // Validate JSON structure
+                    if (event.length > 100000) { // Max reasonable event size
+                        SecureLog.w("Received intent with suspiciously large event - ignoring")
+                        return
+                    }
+                } catch (e: Exception) {
+                    SecureLog.w("Received intent with invalid event JSON - ignoring")
+                    return
+                }
+            }
+            
             val res = IntentResult(id, result, event, pkg)
 
             if (!id.isNullOrBlank()) {
-                pending.remove(id)?.complete(res)
+                val deferred = pending.remove(id)
+                if (deferred != null) {
+                    deferred.complete(res)
+                    SecureLog.d("Completed pending request: ${id.take(8)}")
+                } else {
+                    SecureLog.w("Received response for unknown request ID: ${id.take(8)}")
+                }
             }
         } catch (e: Exception) {
-            // Ignore malformed responses
+            SecureLog.e("Error handling intent response", e)
         }
     }
 
@@ -90,12 +127,7 @@ object AmberSignerManager {
         val deferred = CompletableDeferred<IntentResult>()
         pending[callId] = deferred
 
-        println("📤 AmberSignerManager: Sending event to Amber")
-        println("   Event JSON: $eventJson")
-        println("   Event ID: $eventId")
-        println("   Call ID: $callId")
-        println("   Package: $pkg")
-        println("   Current user: $pub")
+        SecureLog.d("Sending event to external signer (ID: ${SecureLog.truncateHex(eventId)})")
 
         // Attach unsigned event JSON directly in the URI per NIP-55 and mirror amber login flow
         val uri = android.net.Uri.parse("nostrsigner:$eventJson")
@@ -108,23 +140,17 @@ object AmberSignerManager {
             addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
 
-        println("📱 Launching Amber with intent URI: ${intent.data}")
-        println("   Intent action: ${intent.action}")
-        println("   Intent package: ${intent.`package`}")
-        println("   Intent extras: type=${intent.getStringExtra("type")}, id=$callId, current_user=$pub")
-        println("   Intent flags: ${intent.flags}")
-        println("   Pending requests count: ${pending.size}")
+        SecureLog.d("Launching external signer for event signing")
 
         l(intent)
 
         return try {
-            println("⏳ AmberSignerManager: Waiting for response (timeout: ${timeoutMs}ms)...")
+            SecureLog.d("Waiting for signer response (timeout: ${timeoutMs}ms)")
             val response = withTimeout(timeoutMs) { deferred.await() }
-            println("✅ AmberSignerManager: Received response - event: ${response.event?.take(50)}")
+            SecureLog.d("Received response from signer")
             response
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            println("❌ AmberSignerManager: Timeout waiting for response")
-            println("   Pending requests still waiting: ${pending.keys.joinToString()}")
+            SecureLog.w("Timeout waiting for signer response")
             throw e
         } finally {
             pending.remove(callId)

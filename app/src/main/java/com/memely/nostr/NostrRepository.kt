@@ -4,6 +4,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.json.JSONArray
 import org.json.JSONObject
+import com.memely.utils.SecureJsonParser
+import com.memely.util.SecureLog
 
 object NostrRepository {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -34,18 +36,18 @@ object NostrRepository {
         
         // FIX: Prevent duplicate connections to same relays
         if (isConnecting) {
-            println("⏭️ NostrRepository: Already connecting, skipping")
+            SecureLog.d("NostrRepository: Already connecting, skipping")
             return
         }
         
         if (currentRelays.sorted() == lastConnectedRelays.sorted()) {
-            println("⏭️ NostrRepository: Already connected to these relays, skipping")
+            SecureLog.d("NostrRepository: Already connected to these relays, skipping")
             return
         }
         
         isConnecting = true
         try {
-            println("🔄 NostrRepository: Connecting to ${currentRelays.size} relays: ${currentRelays.take(3)}...")
+            SecureLog.d("NostrRepository: Connecting to ${currentRelays.size} relays: ${currentRelays.take(3)}...")
             relayPool.updateRelays(currentRelays)
             lastConnectedRelays = currentRelays
             isInitialConnectionDone = true
@@ -57,11 +59,11 @@ object NostrRepository {
     // Main function to fetch both metadata and relays
     suspend fun fetchUserProfile(pubkey: String): Pair<MetadataParser.UserMetadata?, List<String>> {
         if (pubkey.isBlank()) {
-            println("❌ NostrRepository: Invalid pubkey")
+            SecureLog.e("NostrRepository: Invalid pubkey")
             return null to emptyList()
         }
         
-        println("🔍 NostrRepository: Fetching profile and relays for ${pubkey.take(8)}...")
+        SecureLog.d("NostrRepository: Fetching profile and relays for ${pubkey.take(8)}...")
         
         var metadata: MetadataParser.UserMetadata? = null
         val relays = mutableListOf<String>()
@@ -84,22 +86,22 @@ object NostrRepository {
                                     _metadataState.value = parsedMetadata
                                     // CRITICAL: Cache metadata immediately so it persists even if coroutines are cancelled
                                     UserMetadataCache.cacheMetadata(pubkey, parsedMetadata)
-                                    println("✅ NostrRepository: Found metadata: ${parsedMetadata.name}")
+                                    SecureLog.d("NostrRepository: Found metadata: ${parsedMetadata.name}")
                                 }
                             }
                             msg.contains("\"kind\":10002") && msg.contains(pubkey) -> {
-                                println("🎯 NostrRepository: Processing potential relay list message")
+                                SecureLog.d("NostrRepository: Processing potential relay list message")
                                 val parsedRelays = parseRelayListFromMessage(msg, pubkey)
                                 if (parsedRelays.isNotEmpty()) {
                                     relays.addAll(parsedRelays)
                                     _userRelaysState.value = parsedRelays
                                     RelayManager.updateUserRelays(parsedRelays)
-                                    println("✅ NostrRepository: Found ${parsedRelays.size} user relays: ${parsedRelays.take(3)}...")
+                                    SecureLog.d("NostrRepository: Found ${parsedRelays.size} user relays: ${parsedRelays.take(3)}...")
                                     
                                     // CRITICAL: Update relay pool with user's preferred relays
                                     updateRelayPoolWithUserRelays(parsedRelays)
                                 } else {
-                                    println("⚠️ NostrRepository: Relay list parsed but empty - check parsing logic")
+                                    SecureLog.w("NostrRepository: Relay list parsed but empty - check parsing logic")
                                 }
                             }
                         }
@@ -107,26 +109,26 @@ object NostrRepository {
                         // REMOVED: Don't cancel early, let the timeout handle it
                         // This prevents the coroutine scope cancellation from affecting relay connections
                     } catch (e: Exception) {
-                        println("❌ NostrRepository: Error processing message: ${e.message}")
+                        SecureLog.e("NostrRepository: Error processing message: ${e.message}")
                     }
                 }
             }
         } catch (e: TimeoutCancellationException) {
-            println("⏰ NostrRepository: Timeout waiting for profile data from $pubkey")
+            SecureLog.w("NostrRepository: Timeout waiting for profile data from $pubkey")
         }
 
         // ONLY create basic metadata if we never found real metadata
         if (metadata == null && !hasRealMetadata) {
             metadata = createBasicMetadata()
             _metadataState.value = metadata
-            println("📝 NostrRepository: Created basic metadata for user (no real data found)")
+            SecureLog.d("NostrRepository: Created basic metadata for user (no real data found)")
         } else if (metadata == null) {
-            println("📊 NostrRepository: Using existing real metadata from continuous listener")
+            SecureLog.d("NostrRepository: Using existing real metadata from continuous listener")
             metadata = _metadataState.value
         }
 
         // Log results
-        println("📊 NostrRepository: Fetch completed - metadata: ${metadata?.name ?: "null"}, relays: ${relays.size}")
+        SecureLog.d("NostrRepository: Fetch completed - metadata: ${metadata?.name ?: "null"}, relays: ${relays.size}")
         
         return metadata to relays
     }
@@ -134,11 +136,11 @@ object NostrRepository {
     // FIXED: Better metadata fetching with proper timeout and request issuance
     suspend fun fetchProfileMetadata(pubkey: String): MetadataParser.UserMetadata? {
         if (pubkey.isBlank()) {
-            println("❌ NostrRepository: Invalid pubkey for metadata fetch")
+            SecureLog.e("NostrRepository: Invalid pubkey for metadata fetch")
             return null
         }
         
-        println("🔍 NostrRepository: Fetching metadata for ${pubkey.take(8)}...")
+        SecureLog.d("NostrRepository: Fetching metadata for ${pubkey.take(8)}...")
         
         var metadata: MetadataParser.UserMetadata? = null
         
@@ -156,17 +158,17 @@ object NostrRepository {
                                 metadata = parsedMetadata
                                 // CRITICAL: Cache metadata immediately so it persists even if coroutines are cancelled
                                 UserMetadataCache.cacheMetadata(pubkey, parsedMetadata)
-                                println("✅ NostrRepository: Found metadata for ${pubkey.take(8)}: ${parsedMetadata.name}")
+                                SecureLog.d("NostrRepository: Found metadata for ${pubkey.take(8)}: ${parsedMetadata.name}")
                                 cancel() // Stop collection once we found the metadata
                             }
                         }
                     } catch (e: Exception) {
-                        println("❌ NostrRepository: Error processing metadata message: ${e.message}")
+                        SecureLog.e("NostrRepository: Error processing metadata message: ${e.message}")
                     }
                 }
             }
         } catch (e: TimeoutCancellationException) {
-            println("⏰ NostrRepository: Timeout waiting for metadata from ${pubkey.take(8)}")
+            SecureLog.w("NostrRepository: Timeout waiting for metadata from ${pubkey.take(8)}")
         }
 
         return metadata
@@ -175,20 +177,20 @@ object NostrRepository {
     // CRITICAL FIX: Update relay pool with user's preferred relays
     private suspend fun updateRelayPoolWithUserRelays(newRelays: List<String>) {
         if (newRelays.isNotEmpty()) {
-            println("🔄 NostrRepository: Updating relay pool with ${newRelays.size} user relays")
-            println("📋 NostrRepository: User relays: ${newRelays.take(5)}...")
+            SecureLog.d("NostrRepository: Updating relay pool with ${newRelays.size} user relays")
+            SecureLog.d("NostrRepository: User relays: ${newRelays.take(5)}...")
             try {
                 relayPool.updateRelays(newRelays)
-                println("✅ NostrRepository: Successfully updated relay pool to user's preferred relays")
+                SecureLog.d("NostrRepository: Successfully updated relay pool to user's preferred relays")
                 
                 // Log the current state for debugging
-                println("📊 NostrRepository: RelayManager effective relays: ${RelayManager.effectiveRelays.value.size}")
-                println("📊 NostrRepository: RelayPool current relays: ${relayPool.getCurrentRelays().size}")
+                SecureLog.d("NostrRepository: RelayManager effective relays: ${RelayManager.effectiveRelays.value.size}")
+                SecureLog.d("NostrRepository: RelayPool current relays: ${relayPool.getCurrentRelays().size}")
             } catch (e: Exception) {
-                println("❌ NostrRepository: Failed to update relay pool: ${e.message}")
+                SecureLog.e("NostrRepository: Failed to update relay pool: ${e.message}")
             }
         } else {
-            println("⚠️ NostrRepository: No relays to update - empty list")
+            SecureLog.w("NostrRepository: No relays to update - empty list")
         }
     }
 
@@ -196,21 +198,21 @@ object NostrRepository {
         val subscriptionId = "relays-${pubkey.take(8)}"
         val req = """["REQ","$subscriptionId",{"kinds":[10002],"authors":["$pubkey"]}]"""
         
-        println("📤 NostrRepository: Requesting relay list: $req")
+        SecureLog.d("NostrRepository: Requesting relay list: $req")
         relayPool.broadcast(req)
     }
 
     private fun parseRelayListFromMessage(msg: String, targetPubkey: String): List<String> {
         return try {
-            println("🔍 NostrRepository: Attempting to parse relay list from message: ${msg.take(300)}")
+            SecureLog.d("NostrRepository: Attempting to parse relay list from message: ${msg.take(300)}")
             
             if (msg.trim().startsWith("[")) {
                 val arr = JSONArray(msg)
-                println("📊 NostrRepository: JSON array length: ${arr.length()}")
+                SecureLog.d("NostrRepository: JSON array length: ${arr.length()}")
                 
                 if (arr.length() >= 3) {
                     val messageType = arr.optString(0)
-                    println("📨 NostrRepository: Message type: $messageType")
+                    SecureLog.d("NostrRepository: Message type: $messageType")
                     
                     if (messageType == "EVENT") {
                         val eventObj = arr.getJSONObject(2)
@@ -219,37 +221,37 @@ object NostrRepository {
                         val content = eventObj.optString("content", "{}")
                         val tags = eventObj.optJSONArray("tags")
                         
-                        println("🎯 NostrRepository: Found EVENT - kind: $kind, pubkey: ${eventPubkey.take(8)}")
+                        SecureLog.d("NostrRepository: Found EVENT - kind: $kind, pubkey: ${eventPubkey.take(8)}")
                         
                         if (kind == 10002 && eventPubkey == targetPubkey) {
-                            println("✅ NostrRepository: Found matching NIP-65 relay list!")
+                            SecureLog.d("NostrRepository: Found matching NIP-65 relay list!")
                             
                             // Try parsing from tags first (new NIP-65 format)
                             val relaysFromTags = parseRelaysFromTags(tags)
                             if (relaysFromTags.isNotEmpty()) {
-                                println("🏷️ NostrRepository: Found ${relaysFromTags.size} relays from tags: ${relaysFromTags.take(3)}...")
+                                SecureLog.d("NostrRepository: Found ${relaysFromTags.size} relays from tags: ${relaysFromTags.take(3)}...")
                                 return relaysFromTags
                             }
                             
                             // Fallback to content parsing (old format)
                             val parsedRelays = MetadataParser.parseRelayList(content)
-                            println("🌐 NostrRepository: Parsed ${parsedRelays.size} relays from content: ${parsedRelays.take(3)}...")
+                            SecureLog.d("NostrRepository: Parsed ${parsedRelays.size} relays from content: ${parsedRelays.take(3)}...")
                             return parsedRelays
                         } else {
-                            println("❌ NostrRepository: Event doesn't match - kind: $kind (expected 10002), pubkey: ${eventPubkey.take(8)} (expected ${targetPubkey.take(8)})")
+                            SecureLog.w("NostrRepository: Event doesn't match - kind: $kind (expected 10002), pubkey: ${eventPubkey.take(8)} (expected ${targetPubkey.take(8)})")
                         }
                     } else {
-                        println("❌ NostrRepository: Not an EVENT message, type: $messageType")
+                        SecureLog.w("NostrRepository: Not an EVENT message, type: $messageType")
                     }
                 } else {
-                    println("❌ NostrRepository: JSON array too short, length: ${arr.length()}")
+                    SecureLog.w("NostrRepository: JSON array too short, length: ${arr.length()}")
                 }
             } else {
-                println("❌ NostrRepository: Message doesn't start with '[' - not a JSON array")
+                SecureLog.w("NostrRepository: Message doesn't start with '[' - not a JSON array")
             }
             emptyList()
         } catch (e: Exception) {
-            println("❌ NostrRepository: Error parsing relay list: ${e.message}")
+            SecureLog.e("NostrRepository: Error parsing relay list: ${e.message}")
             emptyList()
         }
     }
@@ -258,11 +260,11 @@ object NostrRepository {
         val relays = mutableListOf<String>()
         
         if (tags == null) {
-            println("⚠️ NostrRepository: Tags array is null")
+            SecureLog.w("NostrRepository: Tags array is null")
             return emptyList()
         }
         
-        println("🏷️ NostrRepository: Processing ${tags.length()} tags")
+        SecureLog.d("NostrRepository: Processing ${tags.length()} tags")
         
         for (i in 0 until tags.length()) {
             try {
@@ -276,11 +278,11 @@ object NostrRepository {
                     }
                 }
             } catch (e: Exception) {
-                println("⚠️ NostrRepository: Error processing tag #$i: ${e.message}")
+                SecureLog.w("NostrRepository: Error processing tag #$i: ${e.message}")
             }
         }
         
-        println("🌐 NostrRepository: Found ${relays.size} relays from tags")
+        SecureLog.d("NostrRepository: Found ${relays.size} relays from tags")
         return relays
     }
 
@@ -304,7 +306,7 @@ object NostrRepository {
             
             null
         } catch (e: Exception) {
-            println("❌ NostrRepository: Failed to parse message as JSON: ${e.message}")
+            SecureLog.e("NostrRepository: Failed to parse message as JSON: ${e.message}")
             null
         }
     }
@@ -346,11 +348,11 @@ object NostrRepository {
         
         scope.launch {
             isRelayListenerActive = true
-            println("🎯 NostrRepository: Starting relay listener for ${pubkey.take(8)}")
+            SecureLog.d("NostrRepository: Starting relay listener for ${pubkey.take(8)}")
             incomingMessagesFlow.collect { msg ->
                 try {
                     if (msg.contains("\"kind\":10002") && msg.contains(pubkey)) {
-                        println("📨 NostrRepository: Relay listener processing message")
+                        SecureLog.d("NostrRepository: Relay listener processing message")
                         val relays = parseRelayListFromMessage(msg, pubkey)
                         if (relays.isNotEmpty()) {
                             _userRelaysState.value = relays
@@ -359,7 +361,7 @@ object NostrRepository {
                         }
                     }
                 } catch (e: Exception) {
-                    println("❌ NostrRepository: Error in relay listener: ${e.message}")
+                    SecureLog.e("NostrRepository: Error in relay listener: ${e.message}")
                 }
             }
         }
@@ -398,15 +400,15 @@ object NostrRepository {
      */
     fun publishEvent(eventMessage: String) {
         val connectedCount = relayPool.getConnectedCount()
-        println("📤 NostrRepository: Publishing event to $connectedCount connected relays")
+        SecureLog.d("NostrRepository: Publishing event to $connectedCount connected relays")
         
         if (connectedCount == 0) {
-            println("⚠️ NostrRepository: No relays connected! Event will not be published.")
-            println("💡 NostrRepository: Call connectAll() first to establish relay connections")
+            SecureLog.w("NostrRepository: No relays connected! Event will not be published.")
+            SecureLog.w("NostrRepository: Call connectAll() first to establish relay connections")
             return
         }
         
-        println("📝 NostrRepository: Event message preview: ${eventMessage.take(200)}...")
+        SecureLog.d("NostrRepository: Event message preview: ${eventMessage.take(200)}...")
         
         // Extract event ID for monitoring responses
         try {
@@ -428,14 +430,14 @@ object NostrRepository {
                             when {
                                 msg.contains("\"OK\"") && msg.contains("true") -> {
                                     okCount++
-                                    println("✅ Relay accepted event: $eventId")
+                                    SecureLog.d("NostrRepository: Relay accepted event: $eventId")
                                 }
                                 msg.contains("\"OK\"") && msg.contains("false") -> {
                                     failCount++
-                                    println("❌ Relay rejected event: $msg")
+                                    SecureLog.w("NostrRepository: Relay rejected event: $msg")
                                 }
                                 msg.contains("\"NOTICE\"") -> {
-                                    println("⚠️ Relay notice: $msg")
+                                    SecureLog.w("NostrRepository: Relay notice: $msg")
                                 }
                             }
                         }
@@ -443,11 +445,11 @@ object NostrRepository {
                 }
             }
         } catch (e: Exception) {
-            println("⚠️ Could not monitor relay responses: ${e.message}")
+            SecureLog.w("NostrRepository: Could not monitor relay responses: ${e.message}")
         }
         
         relayPool.broadcast(eventMessage)
-        println("✅ NostrRepository: Event broadcast complete")
+        SecureLog.d("NostrRepository: Event broadcast complete")
     }
 
     fun requestMetadata(pubkey: String) {

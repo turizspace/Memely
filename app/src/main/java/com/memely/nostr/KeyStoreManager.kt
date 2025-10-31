@@ -1,14 +1,19 @@
 package com.memely.nostr
 
 import android.content.Context
-import android.content.SharedPreferences
+import com.memely.util.SecureStorage
 import java.util.Locale
 
+/**
+ * Secure key storage manager using EncryptedSharedPreferences.
+ * All private keys are stored encrypted at rest.
+ */
 object KeyStoreManager {
-    private lateinit var prefs: SharedPreferences
+    private lateinit var secureStorage: SecureStorage
 
     fun init(context: Context) {
-        prefs = context.getSharedPreferences("memely_keystore", Context.MODE_PRIVATE)
+        SecureStorage.init(context)
+        secureStorage = SecureStorage.getInstance()
     }
 
     private var inMemoryPrivHex: String? = null
@@ -21,46 +26,48 @@ object KeyStoreManager {
         val pubHex = KeyUtils.publicKeyXOnlyHexFromPrivate(privBytes)
         inMemoryPrivHex = privBytes.toHex()
         inMemoryPubHex = pubHex
-        saveKeysToPrefs(inMemoryPrivHex, inMemoryPubHex)
+        saveKeysToSecureStorage(inMemoryPrivHex, inMemoryPubHex)
     }
 
     fun importNpub(npub: String) {
         require(npub.lowercase(Locale.ROOT).startsWith("npub")) { "Invalid npub prefix" }
         val pubHex = Nip19.decodeToHex(npub)
         inMemoryPubHex = pubHex
-        saveKeysToPrefs(null, pubHex)
+        saveKeysToSecureStorage(null, pubHex)
     }
 
-    private fun saveKeysToPrefs(privHex: String?, pubHex: String?) {
-        prefs.edit().apply {
-            if (privHex != null) putString("priv_hex", privHex)
-            if (pubHex != null) putString("pub_hex", pubHex)
-        }.apply()
+    private fun saveKeysToSecureStorage(privHex: String?, pubHex: String?) {
+        if (privHex != null) {
+            secureStorage.putString("priv_hex", privHex)
+        }
+        if (pubHex != null) {
+            secureStorage.putString("pub_hex", pubHex)
+        }
     }
 
     fun saveExternalPubkey(npub: String) {
         val pubHex = Nip19.decodeToHex(npub)
-        prefs.edit().putString("external_pubkey", pubHex).apply()
-        println("✅ Saved external pubkey from Amber (hex): $pubHex")
+        secureStorage.putString("external_pubkey", pubHex)
+        // Note: Logging removed for security - pubkeys stored securely
     }
 
     fun saveAmberPackageName(packageName: String) {
-        prefs.edit().putString("amber_package", packageName).apply()
-        println("✅ Saved Amber package name: $packageName")
+        secureStorage.putString("amber_package", packageName)
+        // Note: Logging removed for security
     }
 
     fun getAmberPackageName(): String? {
-        return prefs.getString("amber_package", null)
+        return secureStorage.getString("amber_package")
     }
 
     fun getPubkeyHex(): String? =
-        prefs.getString("pub_hex", null)
-            ?: prefs.getString("external_pubkey", null)
+        secureStorage.getString("pub_hex")
+            ?: secureStorage.getString("external_pubkey")
             ?: inMemoryPubHex
 
     fun exportNpubBech32(): String? = getPubkeyHex()?.let { Nip19.encode("npub", it) }
 
-    fun exportNsecHex(): String? = inMemoryPrivHex ?: prefs.getString("priv_hex", null)
+    fun exportNsecHex(): String? = inMemoryPrivHex ?: secureStorage.getString("priv_hex")
     fun exportNsecBech32(): String? = exportNsecHex()?.let { Nip19.encode("nsec", it) }
 
     /**
@@ -68,13 +75,16 @@ object KeyStoreManager {
      * Returns true if we have a pubkey but no private key.
      */
     fun isUsingAmber(): Boolean {
-        val hasExternal = prefs.getString("external_pubkey", null) != null
+        val hasExternal = secureStorage.getString("external_pubkey") != null
         val hasPrivKey = exportNsecHex() != null
         return hasExternal && !hasPrivKey
     }
 
     fun clear() {
-        prefs.edit().clear().apply()
+        secureStorage.remove("priv_hex")
+        secureStorage.remove("pub_hex")
+        secureStorage.remove("external_pubkey")
+        secureStorage.remove("amber_package")
         inMemoryPrivHex = null
         inMemoryPubHex = null
     }

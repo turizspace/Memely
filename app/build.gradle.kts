@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -13,7 +16,7 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0.2"
     }
 
     buildFeatures {
@@ -37,16 +40,24 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("turiz.keystore")
-            storePassword = "ch0wd3r@t"
-            keyAlias = "mykey"
-            keyPassword = "ch0wd3r@t"
+            // Load keystore properties from secure file
+            val keystorePropertiesFile = rootProject.file("keystore.properties")
+            if (keystorePropertiesFile.exists()) {
+                val keystoreProperties = Properties()
+                keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+                
+                storeFile = file(keystoreProperties["storeFile"].toString())
+                storePassword = keystoreProperties["storePassword"].toString()
+                keyAlias = keystoreProperties["keyAlias"].toString()
+                keyPassword = keystoreProperties["keyPassword"].toString()
+            }
         }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -74,8 +85,8 @@ android {
 tasks.all {
     if (name == "bundleRelease") {
         doLast {
-            val bundleFile = File("$buildDir/outputs/bundle/release/app-release.aab")
-            val newBundleFile = File("$buildDir/outputs/bundle/release/memely-v${android.defaultConfig.versionName}.aab")
+            val bundleFile = File("${layout.buildDirectory.get()}/outputs/bundle/release/app-release.aab")
+            val newBundleFile = File("${layout.buildDirectory.get()}/outputs/bundle/release/memely-v${android.defaultConfig.versionName}.aab")
             if (bundleFile.exists() && !newBundleFile.exists()) {
                 bundleFile.renameTo(newBundleFile)
                 println("Renamed bundle to: memely-v${android.defaultConfig.versionName}.aab")

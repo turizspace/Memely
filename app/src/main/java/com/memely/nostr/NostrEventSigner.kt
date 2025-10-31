@@ -35,13 +35,13 @@ object NostrEventSigner {
         
         val serialized = """[0,"$pubkeyHex",$createdAt,$kind,$tagsJson,"$contentEscaped"]"""
         
-        println("🔍 Event serialization for hash: $serialized")
+        // Note: Logging removed for security - event serialization contains sensitive data
         
         val eventBytes = serialized.toByteArray(StandardCharsets.UTF_8)
         val hash = MessageDigest.getInstance("SHA-256").digest(eventBytes)
         val eventId = hash.toHex()
         
-        println("🔑 Computed event ID: $eventId")
+        // Note: Logging removed for security - event IDs can be correlated to users
         
         // Sign the hash using BIP-340 Schnorr
         val signature = schnorrSign(hash, privKeyBytes)

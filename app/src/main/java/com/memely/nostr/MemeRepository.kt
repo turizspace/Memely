@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import com.memely.util.SecureLog
+
 
 data class MemeNote(
     val id: String,
@@ -40,7 +42,7 @@ object MemeRepository {
         }
         
         val req = """["REQ","$subscriptionId",$filter]"""
-        println("📤 MemeRepository: Requesting memes: $req")
+        SecureLog.d("MemeRepository: Requesting memes: $req")
         NostrRepository.broadcast(req)
         
         // Start listening for meme notes
@@ -62,17 +64,17 @@ object MemeRepository {
                                 // Sort by createdAt in descending order (newest first)
                                 currentNotes.sortByDescending { it.createdAt }
                                 _memeNotesFlow.value = currentNotes.take(100) // Limit to 100 memes
-                                println("✅ MemeRepository: Added meme note from ${memeNote.pubkey.take(8)}, total: ${_memeNotesFlow.value.size}")
+                                SecureLog.d("MemeRepository: Added meme note from ${memeNote.pubkey.take(8)}, total: ${_memeNotesFlow.value.size}")
                                 // Mark loading as complete once we have at least one meme
                                 if (_memeNotesFlow.value.isNotEmpty() && _isLoadingFlow.value) {
                                     _isLoadingFlow.value = false
-                                    println("✅ MemeRepository: Initial memes loaded")
+                                    SecureLog.d("MemeRepository: Initial memes loaded")
                                 }
                             }
                         }
                     }
                 } catch (e: Exception) {
-                    println("❌ MemeRepository: Error processing message: ${e.message}")
+                    SecureLog.e("MemeRepository: Error processing message: ${e.message}")
                 }
             }
         }
@@ -133,7 +135,7 @@ object MemeRepository {
             }
             null
         } catch (e: Exception) {
-            println("❌ MemeRepository: Error parsing meme note: ${e.message}")
+            SecureLog.e("MemeRepository: Error parsing meme note: ${e.message}")
             null
         }
     }

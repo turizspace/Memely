@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Exclude all EncryptedSharedPreferences from backup -->
+    <exclude domain="sharedpref" path="secure_memely_prefs.xml" />
+    <exclude domain="sharedpref" path="secure_memely_prefs.xml.bak" />
+    
+    <!-- Exclude plaintext keystore (will be migrated to secure storage) -->
+    <exclude domain="sharedpref" path="memely_keystore.xml" />
+    <exclude domain="sharedpref" path="memely_keystore.xml.bak" />
+    
+    <!-- Exclude master keys used for encryption -->
+    <exclude domain="sharedpref" path="androidx.security.crypto.EncryptedSharedPreferences.*" />
+    
+    <!-- Exclude all files that might contain sensitive data -->
+    <exclude domain="file" path="." />
+    
+    <!-- You can selectively include non-sensitive data if needed -->
+    <!-- <include domain="sharedpref" path="app_settings.xml" /> -->
+</full-backup-content>

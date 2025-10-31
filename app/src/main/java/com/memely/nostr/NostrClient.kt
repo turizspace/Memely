@@ -1,5 +1,7 @@
 package com.memely.nostr
 
+import com.memely.network.SecureHttpClient
+import com.memely.utils.SecureJsonParser
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.*
@@ -12,13 +14,15 @@ import kotlin.coroutines.resume
  * 
  * Parses OK messages from relays and reports acceptance/rejection via RelayEventTracker
  * Format: ["OK", <event_id>, <accepted>, <message>]
+ * 
+ * Security: Uses SecureHttpClient for WebSocket connections with proper timeouts.
  */
 class NostrClient(private val relayUrl: String) {
     private var webSocket: WebSocket? = null
     val incoming = Channel<String>(Channel.BUFFERED)
 
     suspend fun connect(): Boolean = suspendCancellableCoroutine { cont ->
-        val client = OkHttpClient()
+        val client = SecureHttpClient.createWebSocketClient()
         val request = Request.Builder().url(relayUrl).build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
@@ -65,7 +69,9 @@ class NostrClient(private val relayUrl: String) {
                 return  // Not an OK response
             }
             
-            val array = JSONArray(text)
+            // Use secure parser with validation
+            val array = SecureJsonParser.parseNostrMessage(text) ?: return
+            
             if (array.length() < 4) {
                 return  // Invalid format
             }

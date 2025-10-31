@@ -46,7 +46,7 @@ fun MemeCanvas(
             // Download from remote URL and save to cache
             withContext(Dispatchers.IO) {
                 try {
-                    val httpClient = OkHttpClient()
+                    val httpClient = com.memely.network.SecureHttpClient.createDownloadClient()
                     val request = Request.Builder().url(uriString).build()
                     
                     httpClient.newCall(request).execute().use { response ->
@@ -169,6 +169,9 @@ fun MemeCanvas(
                 },
                 onSelect = {
                     viewModel.selectText(idx)
+                },
+                onMeasuredWidthChange = { measuredWidthPx ->
+                    viewModel.updateTextMeasuredWidth(idx, measuredWidthPx)
                 }
             )
         }

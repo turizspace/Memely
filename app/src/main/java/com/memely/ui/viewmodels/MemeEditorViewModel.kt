@@ -23,7 +23,9 @@ data class MemeText(
     var fontFamily: androidx.compose.ui.text.font.FontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
     var fontWeight: androidx.compose.ui.text.font.FontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
     var fontStyle: androidx.compose.ui.text.font.FontStyle = androidx.compose.ui.text.font.FontStyle.Normal,
-    var textAlign: androidx.compose.ui.text.style.TextAlign = androidx.compose.ui.text.style.TextAlign.Center
+    var textAlign: androidx.compose.ui.text.style.TextAlign = androidx.compose.ui.text.style.TextAlign.Center,
+    var maxWidth: androidx.compose.ui.unit.Dp = 300.dp,  // Max width for text wrapping in dp
+    var measuredWidthPx: Float = 0f  // Actual measured width in pixels (used for accurate save)
 )
 
 data class MemeOverlayImage(
@@ -170,6 +172,12 @@ class MemeEditorViewModel {
     fun updateOverlayTransform(idx: Int, offset: Offset, scale: Float, rotation: Float) {
         overlays = overlays.mapIndexed { i, o ->
             if (i == idx) o.copy(position = offset, scale = scale, rotation = rotation) else o
+        }
+    }
+    
+    fun updateTextMeasuredWidth(idx: Int, widthPx: Float) {
+        texts = texts.mapIndexed { i, t ->
+            if (i == idx) t.copy(measuredWidthPx = widthPx) else t
         }
     }
     

@@ -3,6 +3,7 @@ package com.memely.ui
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,6 +26,7 @@ import com.memely.ui.components.BottomBar
 import com.memely.ui.components.UserTopBar
 import com.memely.ui.screens.*
 import com.memely.ui.tutorial.TutorialManager
+import com.memely.util.SecureLog
 
 class MainActivity : ComponentActivity() {
 
@@ -36,6 +38,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Prevent screenshots on this activity (contains sensitive key data)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
+        
         KeyStoreManager.init(applicationContext)
 
         // Restore Amber configuration if user logged in with Amber
@@ -44,7 +53,7 @@ class MainActivity : ComponentActivity() {
             val packageName = KeyStoreManager.getAmberPackageName()
             if (pubkey != null && packageName != null) {
                 AmberSignerManager.configure(pubkey, packageName)
-                android.util.Log.d("MemelyApp", "✅ Restored Amber config: pubkey=${pubkey.take(12)}..., package=$packageName")
+                SecureLog.d("Restored external signer config")
             }
         }
 
@@ -68,10 +77,31 @@ class MainActivity : ComponentActivity() {
 
     private fun handleAmberCallback(intent: Intent?) {
         if (intent?.scheme == "nostrsigner") {
-            android.util.Log.d("MemelyApp", "📥 Received nostrsigner callback")
-            android.util.Log.d("MemelyApp", "   URI: ${intent.data}")
-            android.util.Log.d("MemelyApp", "   Extras: ${intent.extras?.keySet()?.joinToString()}")
-            AmberSignerManager.handleIntentResponse(intent)
+            SecureLog.d("Received nostrsigner callback")
+            // Validate intent before processing (security check)
+            if (validateAmberIntent(intent)) {
+                AmberSignerManager.handleIntentResponse(intent)
+            } else {
+                SecureLog.w("Invalid nostrsigner intent received - ignoring")
+            }
+        }
+    }
+    
+    /**
+     * Validate Amber signer intent to prevent intent injection attacks.
+     * Checks for required fields and validates structure.
+     */
+    private fun validateAmberIntent(intent: Intent): Boolean {
+        return try {
+            // Ensure intent has expected extras
+            val id = intent.getStringExtra("id")
+            val result = intent.getStringExtra("result")
+            
+            // At minimum, should have an ID
+            !id.isNullOrBlank()
+        } catch (e: Exception) {
+            SecureLog.e("Error validating intent", e)
+            false
         }
     }
 }
@@ -206,19 +236,11 @@ fun AuthenticatedRoot(onLogout: () -> Unit = {}) {
 
     // Debug relay changes
     LaunchedEffect(effectiveRelays, connectedRelays) {
-        println("🔍 MainActivity RELAY STATE:")
-        println("   - Connected: $connectedRelays")
-        println("   - Total: $totalRelays")
-        println("   - UI Display: $connectedRelays/$totalRelays")
-        if (totalRelays > 10) {
-            println("   - ℹ️ Using user's ${totalRelays} preferred relays (NIP-65)")
-        } else {
-            println("   - ℹ️ Using ${totalRelays} fallback relays")
-        }
+        SecureLog.d("Relay status: $connectedRelays/$totalRelays connected")
     }
 
     LaunchedEffect(pubkeyHex) {
-        println("🔑 MainActivity: Starting Nostr connection for pubkey: ${pubkeyHex?.take(8)}...")
+        SecureLog.d("Starting Nostr connection")
         
         NostrRepository.connectAll()
         
