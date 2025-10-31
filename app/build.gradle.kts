@@ -1,5 +1,6 @@
 import java.util.Properties
 import java.io.FileInputStream
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("com.android.application")
@@ -92,6 +93,15 @@ tasks.all {
                 println("Renamed bundle to: memely-v${android.defaultConfig.versionName}.aab")
             }
         }
+    }
+}
+
+// Ensure Kotlin compile tasks target a supported JVM version (fixes kapt/jvmTarget issues)
+tasks.withType(KotlinCompile::class.java).configureEach {
+    kotlinOptions {
+        jvmTarget = "17"
+        // Use the newer JVM default compatibility flag
+        freeCompilerArgs += listOf("-Xjvm-default=all-compatibility")
     }
 }
 

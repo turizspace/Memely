@@ -1,17 +1,25 @@
-# Add project specific ProGuard rules here.
+# ===============================
+# Memely ProGuard Rules (Fixed)
+# ===============================
+
+# Add project-specific ProGuard rules here.
 # By default, the flags in this file are appended to flags specified
 # in ${sdk.dir}/tools/proguard/proguard-android.txt
 # You can edit the include path and order by changing the proguardFiles
 # directive in build.gradle.
 
-# For more details, see
+# For more details, see:
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# Keep line numbers for debugging stack traces
+# ---------------------------------
+# Debugging / Line Number Retention
+# ---------------------------------
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
 
-# Security: Remove all logging in release builds
+# ---------------------------------
+# Remove logging in release builds
+# ---------------------------------
 -assumenosideeffects class android.util.Log {
     public static *** v(...);
     public static *** d(...);
@@ -21,10 +29,8 @@
 }
 
 -assumenosideeffects class java.io.PrintStream {
-    public void println(%);
-    public void println(**);
-    public void print(%);
-    public void print(**);
+    public void println(...);
+    public void print(...);
 }
 
 -assumenosideeffects class kotlin.io.ConsoleKt {
@@ -32,68 +38,92 @@
     public static *** print(...);
 }
 
+# ---------------------------------
 # Keep Nostr cryptographic classes
+# ---------------------------------
 -keep class com.memely.nostr.** { *; }
 -keep class fr.acinq.secp256k1.** { *; }
 
+# ---------------------------------
 # Keep data models
+# ---------------------------------
 -keep class com.memely.model.** { *; }
 
+# ---------------------------------
 # Keep Compose and AndroidX
+# ---------------------------------
 -keep class androidx.compose.** { *; }
 -dontwarn androidx.compose.**
 
+# ---------------------------------
 # Keep Kotlin metadata
+# ---------------------------------
 -keep class kotlin.Metadata { *; }
 
+# ---------------------------------
 # Keep security crypto classes
--keep class androidx.security.crypto.** { *; }
+# ---------------------------------
+# (Add any crypto library classes here if needed)
 
-# Keep OkHttp
+# ---------------------------------
+# Keep OkHttp & Coil
+# ---------------------------------
 -dontwarn okhttp3.**
--dontwarn okio.**
 -keep class okhttp3.** { *; }
--keep interface okhttp3.** { *; }
 
-# Keep Coil
+-dontwarn coil.**
 -keep class coil.** { *; }
 
-# Keep JSON parsing
+# ---------------------------------
+# Preserve annotations
+# ---------------------------------
+-keepattributes *Annotation*
+
+# ---------------------------------
+# Preserve native method names & JSON
+# ---------------------------------
 -keep class org.json.** { *; }
 
-# Keep BitcoinJ for Bech32
+# keep BitcoinJ for Bech32
 -keep class org.bitcoinj.** { *; }
 -dontwarn org.bitcoinj.**
 
-# Preserve annotations
--keepattributes *Annotation*
+# ---------------------------------
+# Keep SLF4J logging (used by BitcoinJ)
+# ---------------------------------
+-keep class org.slf4j.** { *; }
+-dontwarn org.slf4j.**
+-keep class org.slf4j.impl.** { *; }
+-dontwarn org.slf4j.impl.**
 
-# Preserve native method names
--keepclasseswithmembernames class * {
-    native <methods>;
-}
-
-# Keep custom view constructors
+# ---------------------------------
+# View constructors
+# ---------------------------------
 -keepclasseswithmembers class * {
     public <init>(android.content.Context, android.util.AttributeSet);
 }
-
 -keepclasseswithmembers class * {
     public <init>(android.content.Context, android.util.AttributeSet, int);
 }
 
+# ---------------------------------
 # Keep enums
+# ---------------------------------
 -keepclassmembers enum * {
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
 
+# ---------------------------------
 # Keep Parcelable implementations
+# ---------------------------------
 -keep class * implements android.os.Parcelable {
     public static final android.os.Parcelable$Creator *;
 }
 
-# Keep serializable classes
+# ---------------------------------
+# Keep Serializable classes
+# ---------------------------------
 -keepclassmembers class * implements java.io.Serializable {
     static final long serialVersionUID;
     private static final java.io.ObjectStreamField[] serialPersistentFields;

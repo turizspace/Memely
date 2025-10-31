@@ -3,19 +3,22 @@ package com.memely.util
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
+import androidx.security.crypto.MasterKey
 
 /**
  * Secure storage wrapper using EncryptedSharedPreferences.
  * This provides at-rest encryption for sensitive data like nsec.
  */
 class SecureStorage private constructor(context: Context) {
-    private val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-    
+    // Use the modern MasterKey API (replaces deprecated MasterKeys)
+    private val masterKey: MasterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
+
     private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
-        "secure_memely_prefs",
-        masterKeyAlias,
         context,
+        "secure_memely_prefs",
+        masterKey,
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
