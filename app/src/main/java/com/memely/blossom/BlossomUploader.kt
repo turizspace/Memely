@@ -1,5 +1,7 @@
 package com.memely.blossom
 
+import android.content.Context
+import android.net.Uri
 import android.util.Base64
 import com.memely.network.SecureHttpClient
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +14,7 @@ import okio.BufferedSink
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.InputStream
 import java.security.MessageDigest
 
 /**
@@ -43,6 +46,24 @@ class BlossomClient(
                 digest.update(buffer, 0, read)
             }
         }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Compute SHA-256 hash from a content:// URI using ContentResolver.
+     * Handles scoped storage correctly on Android Q+.
+     */
+    private fun sha256HexFromUri(context: Context, uri: Uri): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            val buffer = ByteArray(8 * 1024)
+            var read: Int
+            while (true) {
+                read = input.read(buffer)
+                if (read <= 0) break
+                digest.update(buffer, 0, read)
+            }
+        } ?: throw IllegalArgumentException("Cannot open input stream for URI: $uri")
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
@@ -139,6 +160,100 @@ class BlossomClient(
                         onProgress?.invoke(sent, totalBytes)
                     }
                 }
+            }
+        }
+
+        val reqBuilder = Request.Builder()
+            .url(url)
+            .put(requestBody)
+            .addHeader("Content-Type", contentType)
+            
+        if (authHeaderValue.isNotBlank()) {
+            // Primary BUD header
+            reqBuilder.addHeader("Authorization", authHeaderValue)
+            // Compatibility headers
+            reqBuilder.addHeader("Blossom-Authorization", authHeaderValue)
+            reqBuilder.addHeader("BlossomAuthorization", authHeaderValue)
+        }
+        
+        val req = reqBuilder.build()
+
+        try {
+            http.newCall(req).execute().use { resp ->
+                val b = resp.body?.string()
+                return@withContext UploadResult(resp.isSuccessful, resp.code, b)
+            }
+        } catch (e: Exception) {
+            return@withContext UploadResult(false, 0, e.message)
+        }
+    }
+
+    /**
+     * Upload from a content:// URI using streaming RequestBody and report progress via [onProgress].
+     * Handles scoped storage correctly on Android Q+.
+     * endpoint can be "upload", "media", or "mirror" depending on Blossom API.
+     * signEventFunc should sign the provided event JSON and return the complete signed event.
+     */
+    suspend fun uploadFile(
+        context: Context,
+        uri: Uri,
+        contentType: String,
+        pubkeyHex: String,
+        signEventFunc: suspend (eventJson: String) -> String,
+        endpoint: String = "upload",
+        onProgress: ((bytesSent: Long, totalBytes: Long) -> Unit)? = null
+    ): UploadResult = withContext(Dispatchers.IO) {
+        // Get file size from ContentResolver
+        val totalBytes = context.contentResolver.openFileDescriptor(uri, "r")?.use { fd ->
+            fd.statSize
+        } ?: throw IllegalArgumentException("Cannot determine file size for URI: $uri")
+        
+        val sha = sha256HexFromUri(context, uri)
+        
+        // Get filename from URI if available
+        val filename = context.contentResolver.query(uri, arrayOf(android.provider.MediaStore.Images.Media.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                cursor.getString(0)
+            } else null
+        } ?: "upload"
+        
+        val authEventJson = if (pubkeyHex.isNotBlank()) {
+            buildAuthEventJson(
+                pubkey = pubkeyHex,
+                signEventFunc = signEventFunc,
+                verb = "upload",
+                fileSha256Hex = sha,
+                content = "Upload $filename"
+            )
+        } else ""
+        
+        val authHeaderValue = if (authEventJson.isNotBlank()) {
+            buildAuthorizationHeaderValue(authEventJson)
+        } else ""
+
+        val url = "$baseUrl/${endpoint.trimStart('/')}"
+
+        val mediaType = contentType.toMediaTypeOrNull() 
+            ?: "application/octet-stream".toMediaTypeOrNull()
+
+        val requestBody = object : RequestBody() {
+            override fun contentType() = mediaType
+
+            override fun contentLength(): Long = totalBytes
+
+            override fun writeTo(sink: BufferedSink) {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    val buffer = ByteArray(8 * 1024)
+                    var read: Int
+                    var sent = 0L
+                    while (true) {
+                        read = input.read(buffer)
+                        if (read == -1) break
+                        sink.write(buffer, 0, read)
+                        sent += read
+                        onProgress?.invoke(sent, totalBytes)
+                    }
+                } ?: throw IllegalArgumentException("Cannot open input stream for URI: $uri")
             }
         }
 

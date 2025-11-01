@@ -269,7 +269,8 @@ fun MemeEditorScreen(
                                 onSuccess = { path ->
                                     coroutineScope.launch(Dispatchers.Main) {
                                         viewModel.isSaving = false
-                                        savedMemeFile = File(path)
+                                        val savedUri = android.net.Uri.parse(path)
+                                        savedMemeFile = null // Clear file reference since we're using URI
                                         
                                         // Step 2: Upload to Blossom
                                         val pubkeyHex = KeyStoreManager.getPubkeyHex()
@@ -291,7 +292,8 @@ fun MemeEditorScreen(
                                         println("🔑 Authentication: ${if (isUsingAmber) "Amber" else "nsec"}")
                                         
                                         blossomViewModel.uploadFile(
-                                            file = File(path),
+                                            context = context,
+                                            uri = savedUri,
                                             contentType = "image/jpeg",
                                             pubkeyHex = pubkeyHex,
                                             signEventFunc = { eventJson ->
