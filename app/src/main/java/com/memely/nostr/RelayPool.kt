@@ -108,15 +108,71 @@ class RelayPool(
             println("⚠️ RelayPool: No connected clients available to broadcast message")
             return
         }
+        
+        println("📡 RelayPool: Broadcasting to $connectedCount connected relays")
+        
         clients.forEach { c -> 
             connectionScope.launch { 
                 try {
-                    c.publish(message) 
+                    // Add a small delay to ensure websocket is truly ready
+                    delay(100)
+                    val success = c.publish(message)
+                    if (!success) {
+                        println("⚠️ RelayPool: Publish returned false for relay: ${c.url}")
+                    }
                 } catch (e: Exception) {
-                    println("❌ Failed to broadcast to relay: ${e.message}")
+                    println("❌ RelayPool: Failed to broadcast to relay: ${e.message}")
                 }
             } 
         }
+    }
+
+    /**
+     * Broadcast with retry logic - ensures message gets to all connected relays
+     */
+    suspend fun broadcastWithRetry(message: String, maxRetries: Int = 3) {
+        val connectedCount = successful.get()
+        if (connectedCount == 0) {
+            println("⚠️ RelayPool: No connected clients available for broadcast with retry")
+            return
+        }
+        
+        println("📡 RelayPool: Broadcasting with retry to $connectedCount relays (max $maxRetries attempts)")
+        
+        var attempt = 0
+        var successCount = 0
+        var failedRelays = mutableListOf<NostrClient>()
+        
+        while (attempt < maxRetries && failedRelays.size < clients.size) {
+            if (attempt > 0) {
+                println("🔄 RelayPool: Broadcast retry attempt ${attempt + 1}/$maxRetries")
+                delay(500)  // Wait before retry
+            }
+            
+            val toTry = if (attempt == 0) clients else failedRelays
+            failedRelays.clear()
+            
+            for (client in toTry) {
+                try {
+                    val success = client.publish(message)
+                    if (success) {
+                        successCount++
+                        println("✅ RelayPool: Event sent to relay: ${client.url}")
+                    } else {
+                        println("⚠️ RelayPool: Publish failed for relay: ${client.url}, will retry")
+                        failedRelays.add(client)
+                    }
+                } catch (e: Exception) {
+                    println("❌ RelayPool: Exception broadcasting to relay: ${e.message}")
+                    failedRelays.add(client)
+                }
+            }
+            
+            if (failedRelays.isEmpty()) break
+            attempt++
+        }
+        
+        println("📊 RelayPool: Broadcast complete - $successCount/${clients.size} relays accepted")
     }
 
     fun fetchUserMetadata(pubkey: String) {

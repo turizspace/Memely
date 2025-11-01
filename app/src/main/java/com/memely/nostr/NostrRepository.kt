@@ -395,7 +395,7 @@ object NostrRepository {
     }
 
     /**
-     * Publish a signed event to all connected relays.
+     * Publish a signed event to all connected relays with improved reliability.
      * @param eventMessage The full EVENT message: ["EVENT", <signedEvent>]
      */
     fun publishEvent(eventMessage: String) {
@@ -417,30 +417,45 @@ object NostrRepository {
             val eventId = match?.groupValues?.get(1)
             
             if (eventId != null) {
-                // Monitor relay responses for this event
+                // Monitor relay responses for this event with extended timeout
                 scope.launch {
                     var okCount = 0
                     var failCount = 0
-                    val timeout = System.currentTimeMillis() + 5000 // 5 second timeout
+                    val timeout = System.currentTimeMillis() + 15000 // 15 second timeout for relay responses
+                    val startTime = System.currentTimeMillis()
                     
-                    incomingMessagesFlow.collect { msg ->
-                        if (System.currentTimeMillis() > timeout) return@collect
-                        
-                        if (msg.contains(eventId)) {
-                            when {
-                                msg.contains("\"OK\"") && msg.contains("true") -> {
-                                    okCount++
-                                    SecureLog.d("NostrRepository: Relay accepted event: $eventId")
+                    try {
+                        incomingMessagesFlow.collect { msg ->
+                            val now = System.currentTimeMillis()
+                            if (now > timeout) {
+                                SecureLog.d("NostrRepository: Relay response monitoring timeout after ${now - startTime}ms")
+                                return@collect
+                            }
+                            
+                            // Check for relay responses mentioning this event
+                            if (msg.contains(eventId)) {
+                                when {
+                                    msg.contains("\"OK\"") && msg.contains("true") -> {
+                                        okCount++
+                                        SecureLog.d("NostrRepository: Relay accepted event: $eventId (OK: $okCount)")
+                                    }
+                                    msg.contains("\"OK\"") && msg.contains("false") -> {
+                                        failCount++
+                                        SecureLog.w("NostrRepository: Relay rejected event: ${msg.take(150)}")
+                                    }
+                                    msg.contains("\"NOTICE\"") -> {
+                                        SecureLog.w("NostrRepository: Relay notice: ${msg.take(150)}")
+                                    }
                                 }
-                                msg.contains("\"OK\"") && msg.contains("false") -> {
-                                    failCount++
-                                    SecureLog.w("NostrRepository: Relay rejected event: $msg")
-                                }
-                                msg.contains("\"NOTICE\"") -> {
-                                    SecureLog.w("NostrRepository: Relay notice: $msg")
+                                
+                                // Log current state periodically
+                                if ((okCount + failCount) % 5 == 0) {
+                                    SecureLog.d("NostrRepository: Current tally - OK: $okCount, Failed: $failCount")
                                 }
                             }
                         }
+                    } catch (e: Exception) {
+                        SecureLog.w("NostrRepository: Error monitoring relay responses: ${e.message}")
                     }
                 }
             }
@@ -449,7 +464,7 @@ object NostrRepository {
         }
         
         relayPool.broadcast(eventMessage)
-        SecureLog.d("NostrRepository: Event broadcast complete")
+        SecureLog.d("NostrRepository: Event broadcast initiated")
     }
 
     fun requestMetadata(pubkey: String) {

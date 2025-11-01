@@ -20,35 +20,38 @@ import kotlin.coroutines.resume
 class NostrClient(private val relayUrl: String) {
     private var webSocket: WebSocket? = null
     val incoming = Channel<String>(Channel.BUFFERED)
+    
+    // Public accessor for relay URL
+    val url: String get() = relayUrl
 
     suspend fun connect(): Boolean = suspendCancellableCoroutine { cont ->
         val client = SecureHttpClient.createWebSocketClient()
         val request = Request.Builder().url(relayUrl).build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(ws: WebSocket, response: Response) {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
                 println("✅ Connected to relay: $relayUrl")
                 if (cont.isActive) cont.resume(true)
             }
 
-            override fun onMessage(ws: WebSocket, text: String) {
+            override fun onMessage(webSocket: WebSocket, text: String) {
                 // Parse and track OK/FAILED responses
                 parseOkResponse(text)
                 incoming.trySend(text)
             }
 
-            override fun onMessage(ws: WebSocket, bytes: ByteString) {
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 val text = bytes.utf8()
                 parseOkResponse(text)
                 incoming.trySend(text)
             }
 
-            override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 println("❌ Relay failed $relayUrl: ${t.message}")
                 if (cont.isActive) cont.resume(false)
             }
 
-            override fun onClosed(ws: WebSocket, code: Int, reason: String) {
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 println("⚠️ Relay closed $relayUrl ($reason)")
             }
         })
