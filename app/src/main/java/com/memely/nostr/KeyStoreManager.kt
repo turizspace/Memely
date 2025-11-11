@@ -45,8 +45,14 @@ object KeyStoreManager {
         }
     }
 
-    fun saveExternalPubkey(npub: String) {
-        val pubHex = Nip19.decodeToHex(npub)
+    fun saveExternalPubkey(pubkeyInput: String) {
+        val pubHex = if (pubkeyInput.lowercase(Locale.ROOT).startsWith("npub")) {
+            // It's a bech32 npub, decode it
+            Nip19.decodeToHex(pubkeyInput)
+        } else {
+            // It's already hex, use it directly
+            pubkeyInput
+        }
         secureStorage.putString("external_pubkey", pubHex)
         // Note: Logging removed for security - pubkeys stored securely
     }

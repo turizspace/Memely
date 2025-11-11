@@ -38,22 +38,24 @@ fun TextLayerBox(
     var scale by remember { mutableStateOf(text.scale) }
     var rotation by remember { mutableStateOf(text.rotation) }
     var textValue by remember { mutableStateOf(text.text) }
-    var hasReportedWidth by remember { mutableStateOf(false) }
 
     // keep state synced with external updates
     LaunchedEffect(text.position) { if (text.position != offset) offset = text.position }
     LaunchedEffect(text.scale) { if (text.scale != scale) scale = text.scale }
     LaunchedEffect(text.rotation) { if (text.rotation != rotation) rotation = text.rotation }
     
-    // Reset width reporting when text or scale changes
-    LaunchedEffect(text.text, text.scale) {
-        hasReportedWidth = false
-    }
+    // Sync text value when external text changes
+    LaunchedEffect(text.text) { if (text.text != textValue) textValue = text.text }
 
     Box(
         modifier = modifier
             .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
-            .graphicsLayer(rotationZ = rotation)
+            .wrapContentSize() // Let text determine its natural size
+            .graphicsLayer(
+                rotationZ = rotation,
+                scaleX = scale,
+                scaleY = scale
+            )
             .border(
                 width = if (text.selected) 2.dp else 0.dp,
                 color = if (text.selected) Color.Red else Color.Transparent,
@@ -68,14 +70,12 @@ fun TextLayerBox(
                 }
             }
             .clickable { onSelect() }
-            .padding((8 * scale).dp)
+            .padding(8.dp) // Fixed padding, not scaled
             .onGloballyPositioned { coordinates ->
-                // Report width once after layout stabilizes to avoid recomposition loops
-                if (!hasReportedWidth && coordinates.size.width > 0) {
-                    hasReportedWidth = true
+                // Report width for saving purposes
+                if (coordinates.size.width > 0) {
                     val measuredWidthPx = coordinates.size.width.toFloat()
                     onMeasuredWidthChange(measuredWidthPx)
-                    println("📏 TextLayerBox measured width: ${measuredWidthPx}px for text='${text.text.take(20)}'")
                 }
             }
     ) {
@@ -88,14 +88,14 @@ fun TextLayerBox(
                 },
                 textStyle = TextStyle(
                     color = text.color,
-                    fontSize = text.fontSize * scale,
+                    fontSize = text.fontSize, // No scale multiplication - handled by graphicsLayer
                     fontFamily = text.fontFamily,
                     fontWeight = text.fontWeight,
                     fontStyle = text.fontStyle,
                     textAlign = text.textAlign
                 ),
                 modifier = Modifier
-                    .widthIn(max = text.maxWidth * scale)
+                    .widthIn(max = text.maxWidth) // No scale multiplication
                     .wrapContentSize(),
                 singleLine = false,
                 maxLines = Int.MAX_VALUE,
@@ -106,14 +106,14 @@ fun TextLayerBox(
                 text = text.text,
                 style = TextStyle(
                     color = text.color,
-                    fontSize = text.fontSize * scale,
+                    fontSize = text.fontSize, // No scale multiplication - handled by graphicsLayer
                     fontFamily = text.fontFamily,
                     fontWeight = text.fontWeight,
                     fontStyle = text.fontStyle,
                     textAlign = text.textAlign
                 ),
                 modifier = Modifier
-                    .widthIn(max = text.maxWidth * scale)
+                    .widthIn(max = text.maxWidth) // No scale multiplication
                     .wrapContentSize(),
                 maxLines = Int.MAX_VALUE
             )

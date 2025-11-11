@@ -238,7 +238,7 @@ object MemeFileSaver {
                 // First paint at display scale to measure text dimensions in screen space
                 val textPaintForMeasure = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = text.color.toArgb()
-                    textSize = text.fontSize.value * text.scale * density  // Include user's gesture scale
+                    textSize = text.fontSize.value * density  // Base fontSize only (scale handled separately)
                     isFakeBoldText = true
                     style = Paint.Style.FILL
                     // Convert Compose TextAlign to Paint.Align
@@ -252,16 +252,14 @@ object MemeFileSaver {
                     }
                 }
 
-                // Account for the 8.dp padding used in TextLayerBox which shifts drawn text inside the box.
-                // Padding is scaled with text scale: .padding((8 * scale).dp)
-                // NOTE: The padding affects layout but the text.position is already the outer box position
-                val textPaddingPx = 8f * text.scale * density
+                // Fixed padding of 8.dp (not scaled with text scale anymore)
+                val textPaddingPx = 8f * density
 
                 // Use the measured width from the editor if available, otherwise calculate it
                 val maxTextWidthPx = if (text.measuredWidthPx > 0) {
                     text.measuredWidthPx
                 } else {
-                    text.maxWidth.value * text.scale * density
+                    text.maxWidth.value * density  // Base maxWidth (scale handled separately)
                 }
                 
                 // Wrap text to match Compose's text wrapping behavior
@@ -301,14 +299,15 @@ object MemeFileSaver {
                 val adjustedY = posRelativeToImage.y + textPaddingPx
                 
                 // Now scale to original image coordinates using separate X/Y scales
+                // Also apply user's scale transform to match graphicsLayer scaling
                 val scaledX = adjustedX * scaleX
                 val scaledY = adjustedY * scaleY
 
                 // Create final paint with full scale applied
-                // The fontSize already includes text.scale (user's gesture), so we only apply scaleX/scaleY
+                // Apply text.scale (user's gesture scale) and scaleX (display to image scale)
                 val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = text.color.toArgb()
-                    textSize = textPaintForMeasure.textSize * scaleX  // Scale from display to image space
+                    textSize = textPaintForMeasure.textSize * text.scale * scaleX  // Base size * user scale * image scale
                     isFakeBoldText = true
                     style = Paint.Style.FILL
                     // Match the alignment from measure paint
@@ -316,13 +315,13 @@ object MemeFileSaver {
                 }
 
                 // Calculate scaled dimensions for rotation center
-                // These dimensions are in display space, need to scale to image space
-                val scaledTextWidth = textWidth * scaleX
-                val scaledTotalTextHeight = totalTextHeight * scaleY
+                // Apply both user scale and image scale
+                val scaledTextWidth = textWidth * text.scale * scaleX
+                val scaledTotalTextHeight = totalTextHeight * text.scale * scaleY
 
                 // Calculate the line height in the final scaled space
-                val scaledLineHeight = lineHeight * scaleY
-                val scaledBaselineOffset = baselineOffset * scaleY
+                val scaledLineHeight = lineHeight * text.scale * scaleY
+                val scaledBaselineOffset = baselineOffset * text.scale * scaleY
 
                 // Log computed values for debugging alignment
                 println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -331,17 +330,17 @@ object MemeFileSaver {
                 println("  Screen Position: (${text.position.x}, ${text.position.y})")
                 println("  Image Offset: (${imageOffsetX}, ${imageOffsetY})")
                 println("  Relative to Image: (${posRelativeToImage.x}, ${posRelativeToImage.y})")
-                println("  Padding: ${textPaddingPx}px (8dp * ${text.scale} * density)")
+                println("  Padding: ${textPaddingPx}px (8dp * density, fixed)")
                 println("  Adjusted (with padding): (${adjustedX}, ${adjustedY})")
-                println("  Scale Factors: scaleX=${scaleX}, scaleY=${scaleY}")
+                println("  Scale Factors: scaleX=${scaleX}, scaleY=${scaleY}, userScale=${text.scale}")
                 println("  Scaled to Image: (${scaledX}, ${scaledY})")
                 println("  ⚠️ EXPECTED in editor: text box outer edge at (${text.position.x}, ${text.position.y})")
                 println("  ⚠️ ACTUAL in saved image: text content starts at (${scaledX}, ${scaledY})")
                 println("  User Scale: ${text.scale}x, Rotation: ${text.rotation}°")
-                println("  Display Font Size: ${textPaintForMeasure.textSize}px")
-                println("  Final Font Size: ${textPaint.textSize}px")
-                println("  Text Dimensions (display): ${textWidth}x${totalTextHeight}px")
-                println("  Text Dimensions (scaled): ${scaledTextWidth}x${scaledTotalTextHeight}px")
+                println("  Display Font Size (base): ${textPaintForMeasure.textSize}px")
+                println("  Final Font Size (with scales): ${textPaint.textSize}px")
+                println("  Text Dimensions (display, base): ${textWidth}x${totalTextHeight}px")
+                println("  Text Dimensions (final, scaled): ${scaledTextWidth}x${scaledTotalTextHeight}px")
                 println("  Rotation Center: (${scaledTextWidth / 2f}, ${scaledTotalTextHeight / 2f})")
                 println("  Lines: ${lines.size}, Max Width: ${maxTextWidthPx}px")
                 println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -355,8 +354,8 @@ object MemeFileSaver {
                 // Paint.Align handles the positioning: LEFT draws from x, CENTER from x-width/2, RIGHT from x-width
                 val alignmentX = when (textPaint.textAlign) {
                     Paint.Align.LEFT -> 0f
-                    Paint.Align.CENTER -> maxTextWidthPx * scaleX / 2f  // Center within max width (scaled to image space)
-                    Paint.Align.RIGHT -> maxTextWidthPx * scaleX  // Right-align to max width (scaled to image space)
+                    Paint.Align.CENTER -> maxTextWidthPx * text.scale * scaleX / 2f  // Center within max width (with all scales)
+                    Paint.Align.RIGHT -> maxTextWidthPx * text.scale * scaleX  // Right-align to max width (with all scales)
                     else -> 0f
                 }
                 

@@ -289,6 +289,18 @@ fun MemeEditorScreen(
                                             return@launch
                                         }
                                         
+                                        // Configure Amber if using external signer
+                                        if (isUsingAmber) {
+                                            val packageName = KeyStoreManager.getAmberPackageName()
+                                            if (packageName != null) {
+                                                AmberSignerManager.configure(pubkeyHex, packageName)
+                                                println("🔑 Configured Amber: package=$packageName")
+                                            } else {
+                                                println("❌ Amber package name not found")
+                                                return@launch
+                                            }
+                                        }
+                                        
                                         println("🔑 Authentication: ${if (isUsingAmber) "Amber" else "nsec"}")
                                         
                                         blossomViewModel.uploadFile(
@@ -528,6 +540,18 @@ fun MemeEditorScreen(
                     return@ComposeNoteDialog
                 }
                 
+                // Configure Amber if using external signer
+                if (isUsingAmber) {
+                    val packageName = KeyStoreManager.getAmberPackageName()
+                    if (packageName != null) {
+                        AmberSignerManager.configure(pubkeyHex, packageName)
+                        println("🔑 Configured Amber for posting: package=$packageName")
+                    } else {
+                        println("❌ Amber package name not found")
+                        return@ComposeNoteDialog
+                    }
+                }
+                
                 if (isUsingAmber) {
                     // Use Amber to sign and publish
                     coroutineScope.launch(Dispatchers.IO) {
@@ -564,10 +588,6 @@ fun MemeEditorScreen(
                             
                             println("🔑 Sending note to Amber for signing. Event ID: $eventId")
                             
-                            // Initialize relay tracking for this event
-                            val relayUrls = NostrRepository.relayPool.getCurrentRelays()
-                            RelayEventTracker.initializeEventTracking(eventId, relayUrls)
-                            
                             // Sign with Amber
                             val result = AmberSignerManager.signEvent(
                                 unsignedEvent.toString(),
@@ -578,6 +598,16 @@ fun MemeEditorScreen(
                                 throw Exception("Amber signing failed")
                             }
                             
+                            // Extract the actual event ID from the signed event
+                            val signedEventJson = org.json.JSONObject(result.event)
+                            val actualEventId = signedEventJson.getString("id")
+                            
+                            println("✅ Amber signed event. Actual Event ID: $actualEventId")
+                            
+                            // Initialize relay tracking with the ACTUAL event ID from signed event
+                            val relayUrls = NostrRepository.relayPool.getCurrentRelays()
+                            RelayEventTracker.initializeEventTracking(actualEventId, relayUrls)
+                            
                             // Publish to relays and track responses
                             val eventMessage = """["EVENT",${result.event}]"""
                             com.memely.nostr.NostrRepository.publishEvent(eventMessage)
@@ -585,13 +615,13 @@ fun MemeEditorScreen(
                             // Wait for relay responses (timeout after 5 seconds)
                             delay(5000)
                             
-                            // Get the publish result
-                            val result_final = RelayEventTracker.getPublishResult(eventId)
-                            RelayEventTracker.completePublish(eventId)
+                            // Get the publish result using the ACTUAL event ID
+                            val result_final = RelayEventTracker.getPublishResult(actualEventId)
+                            RelayEventTracker.completePublish(actualEventId)
                             
                             coroutineScope.launch(Dispatchers.Main) {
-                                nostrPostViewModel.setSuccessState(eventId)
-                                println("✅ Posted to Nostr via Amber: $eventId - ${result_final.acceptedRelays.size}/${result_final.totalRelays} relays accepted")
+                                nostrPostViewModel.setSuccessState(actualEventId)
+                                println("✅ Posted to Nostr via Amber: $actualEventId - ${result_final.acceptedRelays.size}/${result_final.totalRelays} relays accepted")
                                 
                                 // Show relay status
                                 publishResult = result_final
