@@ -33,7 +33,28 @@ class MainActivity : ComponentActivity() {
     private val amberLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        result.data?.let { AmberSignerManager.handleIntentResponse(it) }
+        result.data?.let {
+            AmberSignerManager.handleIntentResponse(it)
+            
+            // Only save pubkey if this is a get_public_key response (not a sign_event response)
+            val intentType = it.getStringExtra("type")
+            val pubkeyBech32 = it.getStringExtra("result")
+            
+            if (intentType == "get_public_key" && !pubkeyBech32.isNullOrBlank() && pubkeyBech32.startsWith("npub")) {
+                val packageName = it.getStringExtra("package") ?: "com.greenart7c3.nostrsigner"
+                
+                // Save to KeyStore
+                KeyStoreManager.saveExternalPubkey(pubkeyBech32)
+                KeyStoreManager.saveAmberPackageName(packageName)
+                
+                // ✅ Reconfigure AmberSignerManager with hex pubkey
+                val pubkeyHex = Nip19.decodeToHex(pubkeyBech32)
+                AmberSignerManager.configure(pubkeyHex, packageName)
+                SecureLog.d("Reconfigured AmberSignerManager from callback")
+            }
+            
+            com.memely.nostr.AuthStateManager.refresh()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,6 +102,25 @@ class MainActivity : ComponentActivity() {
             // Validate intent before processing (security check)
             if (validateAmberIntent(intent)) {
                 AmberSignerManager.handleIntentResponse(intent)
+                
+                // Only save pubkey if this is a get_public_key response (not a sign_event response)
+                val intentType = intent.getStringExtra("type")
+                val pubkeyBech32 = intent.getStringExtra("result")
+                
+                if (intentType == "get_public_key" && !pubkeyBech32.isNullOrBlank() && pubkeyBech32.startsWith("npub")) {
+                    val packageName = intent.getStringExtra("package") ?: "com.greenart7c3.nostrsigner"
+                    
+                    // Save to KeyStore
+                    KeyStoreManager.saveExternalPubkey(pubkeyBech32)
+                    KeyStoreManager.saveAmberPackageName(packageName)
+                    
+                    // ✅ Reconfigure AmberSignerManager with hex pubkey
+                    val pubkeyHex = Nip19.decodeToHex(pubkeyBech32)
+                    AmberSignerManager.configure(pubkeyHex, packageName)
+                    SecureLog.d("Reconfigured AmberSignerManager from intent callback")
+                }
+                
+                com.memely.nostr.AuthStateManager.refresh()
             } else {
                 SecureLog.w("Invalid nostrsigner intent received - ignoring")
             }
@@ -109,7 +149,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppRoot(openUrl: (Intent) -> Unit) {
     val context = LocalContext.current
-    var loggedIn by remember { mutableStateOf(KeyStoreManager.hasKey()) }
+    val loggedIn by com.memely.nostr.AuthStateManager.isLoggedIn.collectAsState()
     var isInitialized by remember { mutableStateOf(false) }
     
     // Initialize TutorialManager
@@ -139,8 +179,8 @@ fun AppRoot(openUrl: (Intent) -> Unit) {
     when {
         !loggedIn -> {
             LoginScreen(
-                onLoggedIn = { 
-                    loggedIn = true
+                onLoggedIn = {
+                    com.memely.nostr.AuthStateManager.refresh()
                 },
                 openUrl = openUrl
             )
@@ -150,7 +190,7 @@ fun AppRoot(openUrl: (Intent) -> Unit) {
                 onLogout = {
                     // Clear all stored keys and credentials
                     KeyStoreManager.clear()
-                    loggedIn = false
+                    com.memely.nostr.AuthStateManager.refresh()
                 }
             )
         }

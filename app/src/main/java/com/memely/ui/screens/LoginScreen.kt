@@ -59,12 +59,19 @@ fun LoginScreen(
                             val result = AmberSignerManager.requestPublicKey()
 
                             if (result.result != null) {
+                                val pubkeyBech32 = result.result!!
                                 val packageName = result.packageName ?: "com.greenart7c3.nostrsigner"
-                                AmberSignerManager.configure(result.result!!, packageName)
-                                KeyStoreManager.saveExternalPubkey(result.result!!)
+                                
+                                // Save to KeyStore
+                                KeyStoreManager.saveExternalPubkey(pubkeyBech32)
                                 KeyStoreManager.saveAmberPackageName(packageName)
-                                android.util.Log.d("MemelyLogin", "✅ Amber login successful. Pubkey: ${result.result}, Package: $packageName")
-                                status = "✅ Amber login successful\nPubkey: ${result.result!!.take(12)}…"
+                                
+                                // ✅ Configure AmberSignerManager with hex pubkey (not bech32)
+                                val pubkeyHex = com.memely.nostr.Nip19.decodeToHex(pubkeyBech32)
+                                AmberSignerManager.configure(pubkeyHex, packageName)
+                                
+                                android.util.Log.d("MemelyLogin", "✅ Amber login successful. Pubkey: $pubkeyBech32, Package: $packageName")
+                                status = "✅ Amber login successful\nPubkey: ${pubkeyBech32.take(12)}…"
                                 onLoggedIn()
                             } else {
                                 status = "❌ Amber did not return a pubkey."
