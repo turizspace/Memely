@@ -78,9 +78,7 @@ fun MemeEditorScreen(
         // Ensure relays are connected
         try {
             RelayConnectionManager.ensureConnected()
-            println("🔗 MemeEditorScreen: Persistent relay connections initialized")
         } catch (e: Exception) {
-            println("❌ MemeEditorScreen: Failed to initialize relay connections: ${e.message}")
         }
     }
     
@@ -88,7 +86,6 @@ fun MemeEditorScreen(
         onDispose {
             // Release relay connection reference when leaving meme editor
             RelayConnectionManager.release()
-            println("🔌 MemeEditorScreen: Released relay connection reference")
         }
     }
 
@@ -112,7 +109,6 @@ fun MemeEditorScreen(
     // Handle Blossom upload errors
     LaunchedEffect(blossomUploadState) {
         if (blossomUploadState is BlossomUploadViewModel.UploadState.Error) {
-            println("❌ Blossom upload error: ${blossomUploadState.message}")
             // Reset state
             blossomViewModel.reset()
         }
@@ -248,11 +244,9 @@ fun MemeEditorScreen(
                             // Verify connection health before starting
                             try {
                                 if (!RelayConnectionManager.verifyConnectionHealth()) {
-                                    println("⚠️ Relay connection health poor, attempting reconnect...")
                                     RelayConnectionManager.ensureConnected()
                             }
                             } catch (e: Exception) {
-                                println("⚠️ Connection check failed: ${e.message}")
                             }
                             
                             // Step 1: Save the meme
@@ -278,13 +272,11 @@ fun MemeEditorScreen(
                                         val privKeyHex = if (!isUsingAmber) KeyStoreManager.exportNsecHex() else null
                                         
                                         if (pubkeyHex.isNullOrBlank()) {
-                                            println("❌ No pubkey available")
                                             // TODO: Show error to user
                                             return@launch
                                         }
                                         
                                         if (!isUsingAmber && privKeyHex.isNullOrBlank()) {
-                                            println("❌ No private key available and not using Amber")
                                             // TODO: Show error to user
                                             return@launch
                                         }
@@ -294,14 +286,11 @@ fun MemeEditorScreen(
                                             val packageName = KeyStoreManager.getAmberPackageName()
                                             if (packageName != null) {
                                                 AmberSignerManager.configure(pubkeyHex, packageName)
-                                                println("🔑 Configured Amber: package=$packageName")
                                             } else {
-                                                println("❌ Amber package name not found")
                                                 return@launch
                                             }
                                         }
                                         
-                                        println("🔑 Authentication: ${if (isUsingAmber) "Amber" else "nsec"}")
                                         
                                         blossomViewModel.uploadFile(
                                             context = context,
@@ -318,17 +307,15 @@ fun MemeEditorScreen(
                                                     jsonObj.put("id", eventId)
                                                     val eventWithId = jsonObj.toString()
                                                     
-                                                    println("🔑 Sending event to Amber for signing. Event ID: $eventId")
+                                                    
                                                     
                                                     try {
                                                         val result = AmberSignerManager.signEvent(eventWithId, eventId)
                                                         if (result.event.isNullOrBlank()) {
                                                             throw Exception("Amber did not return a signed event")
                                                         }
-                                                        println("✅ Amber signing successful")
                                                         result.event
                                                     } catch (e: Exception) {
-                                                        println("❌ Amber signing error: ${e.message}")
                                                         throw e
                                                     }
                                                 } else {
@@ -363,7 +350,6 @@ fun MemeEditorScreen(
                                 onError = {
                                     coroutineScope.launch(Dispatchers.Main) {
                                         viewModel.isSaving = false
-                                        println("❌ Failed to save meme")
                                     }
                                 }
                             )
@@ -386,13 +372,11 @@ fun MemeEditorScreen(
                                 onSuccess = { path ->
                                     coroutineScope.launch(Dispatchers.Main) {
                                         isSavingToDevice = false
-                                        println("✅ Meme saved to: $path")
                                     }
                                 },
                                 onError = {
                                     coroutineScope.launch(Dispatchers.Main) {
                                         isSavingToDevice = false
-                                        println("❌ Failed to save meme")
                                     }
                                 }
                             )
@@ -531,12 +515,10 @@ fun MemeEditorScreen(
                 val privKeyHex = if (!isUsingAmber) KeyStoreManager.exportNsecHex() else null
                 
                 if (pubkeyHex.isNullOrBlank()) {
-                    println("❌ No pubkey available for posting")
                     return@ComposeNoteDialog
                 }
                 
                 if (!isUsingAmber && privKeyHex.isNullOrBlank()) {
-                    println("❌ No private key available and not using Amber")
                     return@ComposeNoteDialog
                 }
                 
@@ -545,9 +527,7 @@ fun MemeEditorScreen(
                     val packageName = KeyStoreManager.getAmberPackageName()
                     if (packageName != null) {
                         AmberSignerManager.configure(pubkeyHex, packageName)
-                        println("🔑 Configured Amber for posting: package=$packageName")
                     } else {
-                        println("❌ Amber package name not found")
                         return@ComposeNoteDialog
                     }
                 }
@@ -586,7 +566,7 @@ fun MemeEditorScreen(
                             val eventId = NostrEventSigner.calculateEventId(unsignedEvent.toString())
                             unsignedEvent.put("id", eventId)
                             
-                            println("🔑 Sending note to Amber for signing. Event ID: $eventId")
+                            
                             
                             // Sign with Amber
                             val result = AmberSignerManager.signEvent(
@@ -602,7 +582,7 @@ fun MemeEditorScreen(
                             val signedEventJson = org.json.JSONObject(result.event)
                             val actualEventId = signedEventJson.getString("id")
                             
-                            println("✅ Amber signed event. Actual Event ID: $actualEventId")
+                            
                             
                             // Initialize relay tracking with the ACTUAL event ID from signed event
                             val relayUrls = NostrRepository.relayPool.getCurrentRelays()
@@ -621,7 +601,6 @@ fun MemeEditorScreen(
                             
                             coroutineScope.launch(Dispatchers.Main) {
                                 nostrPostViewModel.setSuccessState(actualEventId)
-                                println("✅ Posted to Nostr via Amber: $actualEventId - ${result_final.acceptedRelays.size}/${result_final.totalRelays} relays accepted")
                                 
                                 // Show relay status
                                 publishResult = result_final
@@ -633,7 +612,6 @@ fun MemeEditorScreen(
                         } catch (e: Exception) {
                             coroutineScope.launch(Dispatchers.Main) {
                                 nostrPostViewModel.setErrorState("Amber signing failed: ${e.message}")
-                                println("❌ Amber posting error: ${e.message}")
                             }
                         }
                     }
@@ -648,7 +626,7 @@ fun MemeEditorScreen(
                         privKeyBytes = privKeyBytes,
                         coroutineScope = coroutineScope,
                         onSuccess = { actualEventId ->
-                            println("✅ Posted to Nostr via nsec: $actualEventId")
+                            
                             
                             // Wait for relay responses (timeout after 5 seconds)
                             coroutineScope.launch(Dispatchers.IO) {
@@ -742,7 +720,6 @@ fun MemeEditorScreen(
                             showTemplateSelector = false
                         }
                     } catch (e: Exception) {
-                        println("❌ Error adding template: ${e.message}")
                         e.printStackTrace()
                         coroutineScope.launch(Dispatchers.Main) {
                             showTemplateSelector = false

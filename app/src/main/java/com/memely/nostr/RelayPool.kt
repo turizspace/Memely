@@ -22,11 +22,9 @@ class RelayPool(
 
     suspend fun connectAll() = withContext(connectionScope.coroutineContext) {
         if (relays.isEmpty()) {
-            println("⚠️ RelayPool: No relays to connect to")
             return@withContext
         }
         
-        println("🔗 RelayPool: Attempting to connect to ${relays.size} relays...")
         
         // Reset counters
         successful.set(0)
@@ -42,7 +40,6 @@ class RelayPool(
                     if (ok) {
                         val count = successful.incrementAndGet()
                         _connectedRelaysFlow.value = count
-                        println("✅ Connected to relay: $url ($count/${relays.size})")
                         
                         // Start listening for messages
                         launch {
@@ -51,15 +48,12 @@ class RelayPool(
                                     _incomingMessagesFlow.emit(msg)
                                 }
                             } catch (e: Exception) {
-                                println("❌ Error in message stream for $url: ${e.message}")
                             }
                         }
                     } else {
-                        println("❌ Failed to connect: $url")
                         clients.remove(client)
                     }
                 } catch (e: Exception) {
-                    println("❌ Exception connecting to $url: ${e.message}")
                 }
             }
         }
@@ -69,22 +63,15 @@ class RelayPool(
             withTimeout(15000) {
                 connectionJobs.forEach { it.join() }
             }
-            println("🎯 RelayPool: Connection attempts completed. Successfully connected to ${successful.get()}/${relays.size} relays")
         } catch (e: TimeoutCancellationException) {
-            println("⏰ RelayPool: Some connection attempts timed out. Connected to ${successful.get()}/${relays.size} relays so far")
         }
     }
 
     suspend fun updateRelays(newRelays: List<String>) {
         // FIX: Compare content using sorted lists to handle same relays in different order
         if (newRelays.sorted() == relays.sorted()) {
-            println("🔄 RelayPool: Relays unchanged (same relays), skipping update")
             return
         }
-        
-        println("🔄 RelayPool: Updating relays from ${relays.size} to ${newRelays.size} relays")
-        println("📋 RelayPool: Old relays: ${relays.take(3)}...")
-        println("📋 RelayPool: New relays: ${newRelays.take(3)}...")
         
         // Close current connections
         val previousCount = clients.size
@@ -92,8 +79,6 @@ class RelayPool(
         clients.clear()
         successful.set(0)
         _connectedRelaysFlow.value = 0
-        
-        println("🔌 RelayPool: Closed $previousCount previous connections")
         
         // Update relay list
         relays = newRelays
@@ -105,11 +90,8 @@ class RelayPool(
     fun broadcast(message: String) {
         val connectedCount = successful.get()
         if (connectedCount == 0) {
-            println("⚠️ RelayPool: No connected clients available to broadcast message")
             return
         }
-        
-        println("📡 RelayPool: Broadcasting to $connectedCount connected relays")
         
         clients.forEach { c -> 
             connectionScope.launch { 
@@ -118,10 +100,8 @@ class RelayPool(
                     delay(100)
                     val success = c.publish(message)
                     if (!success) {
-                        println("⚠️ RelayPool: Publish returned false for relay: ${c.url}")
                     }
                 } catch (e: Exception) {
-                    println("❌ RelayPool: Failed to broadcast to relay: ${e.message}")
                 }
             } 
         }
@@ -133,11 +113,8 @@ class RelayPool(
     suspend fun broadcastWithRetry(message: String, maxRetries: Int = 3) {
         val connectedCount = successful.get()
         if (connectedCount == 0) {
-            println("⚠️ RelayPool: No connected clients available for broadcast with retry")
             return
         }
-        
-        println("📡 RelayPool: Broadcasting with retry to $connectedCount relays (max $maxRetries attempts)")
         
         var attempt = 0
         var successCount = 0
@@ -145,7 +122,6 @@ class RelayPool(
         
         while (attempt < maxRetries && failedRelays.size < clients.size) {
             if (attempt > 0) {
-                println("🔄 RelayPool: Broadcast retry attempt ${attempt + 1}/$maxRetries")
                 delay(500)  // Wait before retry
             }
             
@@ -157,13 +133,10 @@ class RelayPool(
                     val success = client.publish(message)
                     if (success) {
                         successCount++
-                        println("✅ RelayPool: Event sent to relay: ${client.url}")
                     } else {
-                        println("⚠️ RelayPool: Publish failed for relay: ${client.url}, will retry")
                         failedRelays.add(client)
                     }
                 } catch (e: Exception) {
-                    println("❌ RelayPool: Exception broadcasting to relay: ${e.message}")
                     failedRelays.add(client)
                 }
             }
@@ -171,8 +144,6 @@ class RelayPool(
             if (failedRelays.isEmpty()) break
             attempt++
         }
-        
-        println("📊 RelayPool: Broadcast complete - $successCount/${clients.size} relays accepted")
     }
 
     fun fetchUserMetadata(pubkey: String) {

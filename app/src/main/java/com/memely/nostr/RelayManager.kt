@@ -40,20 +40,17 @@ object RelayManager {
             FALLBACK_RELAYS
         }
         _effectiveRelays.value = newEffectiveRelays
-        println("🌐 RelayManager: Effective relays updated to ${newEffectiveRelays.size} relays")
     }
 
     fun updateUserRelays(relays: List<String>) {
         val validRelays = relays.distinct().filter { it.startsWith("wss://") || it.startsWith("ws://") }
         _userRelays.value = validRelays
         updateEffectiveRelays()
-        println("🔄 RelayManager: Updated user relays to ${validRelays.size} relays: ${validRelays.take(3)}...")
     }
 
     fun clearUserRelays() {
         _userRelays.value = emptyList()
         updateEffectiveRelays()
-        println("🗑️ RelayManager: Cleared user relays")
     }
     
     fun hasUserRelays(): Boolean {

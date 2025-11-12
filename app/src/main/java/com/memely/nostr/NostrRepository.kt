@@ -497,7 +497,7 @@ object NostrRepository {
         val req = """["REQ","$subId",{"kinds":[1,6,7],"#e":["$eventId"],"limit":100}]"""
         
         relayPool.broadcast(req)
-        println("📡 NostrRepository: Subscribed to interactions for event $eventId with subscription $subId")
+        
         
         // Listen for messages
         scope.launch {
@@ -514,7 +514,7 @@ object NostrRepository {
                         }
                     }
                 } catch (e: Exception) {
-                    println("❌ NostrRepository: Error parsing interaction message: ${e.message}")
+                    
                 }
             }
         }
@@ -523,6 +523,6 @@ object NostrRepository {
     fun closeSubscription(subscriptionId: String) {
         val req = """["CLOSE","$subscriptionId"]"""
         relayPool.broadcast(req)
-        println("🔚 NostrRepository: Sent CLOSE for subscription $subscriptionId")
+        
     }
 }

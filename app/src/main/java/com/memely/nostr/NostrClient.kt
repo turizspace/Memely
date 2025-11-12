@@ -30,7 +30,6 @@ class NostrClient(private val relayUrl: String) {
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                println("✅ Connected to relay: $relayUrl")
                 if (cont.isActive) cont.resume(true)
             }
 
@@ -47,12 +46,10 @@ class NostrClient(private val relayUrl: String) {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                println("❌ Relay failed $relayUrl: ${t.message}")
                 if (cont.isActive) cont.resume(false)
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                println("⚠️ Relay closed $relayUrl ($reason)")
             }
         })
     }
@@ -95,10 +92,8 @@ class NostrClient(private val relayUrl: String) {
             // Report to tracker
             if (accepted) {
                 RelayEventTracker.recordAcceptance(eventId, relayUrl)
-                println("✅ OK from $relayUrl: Event $eventId accepted")
             } else {
                 RelayEventTracker.recordRejection(eventId, relayUrl, message)
-                println("❌ OK from $relayUrl: Event $eventId rejected - $message")
             }
             
         } catch (e: Exception) {
