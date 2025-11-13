@@ -355,9 +355,7 @@ private fun PointerArrow(
             y = finalCenterUnclamped.y.coerceIn(halfEmojiPx, screenHeightPx - halfEmojiPx)
         )
 
-        // Debug log for inspection
-        println("🎯 PointerArrow: targetCenter=$targetCenter finalCenter=$finalCenter tooltipPosition=$tooltipPosition emojiDp=$emojiSize")
-
+     
         Text(
             text = when (tooltipPosition) {
                 TooltipPosition.BOTTOM -> "👆"  // Pointing up

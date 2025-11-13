@@ -33,10 +33,7 @@ fun TutorialOverlay(
     // Only show tutorial if active and on the correct screen
     if (isActive && tutorialScreen == currentScreen && currentStep != null) {
         val targetBounds = targetPositions[currentStep.targetTag]
-        
-        // Debug logging
-        println("🎯 TutorialOverlay: Step '${currentStep.id}' looking for target '${currentStep.targetTag}' - found: ${targetBounds != null}")
-        
+      
         CoachMark(
             step = currentStep,
             targetBounds = targetBounds,
@@ -67,7 +64,6 @@ fun TutorialOverlay(
         TutorialTargetRegistry.setPositionUpdater { tag, bounds ->
             targetPositions[tag] = bounds
             // Debug logging
-            println("🎯 TutorialOverlay: Updated target '$tag' on screen $currentScreen - bounds: ${bounds.rect}")
         }
 
         // Force a reposition/pass of any already-registered targets. This handles the case
