@@ -26,6 +26,8 @@ object InteractionPublisher {
                 val userPubkey = KeyStoreManager.getPubkeyHex()
                     ?: throw Exception("No pubkey available")
                 
+                println("🎯 InteractionPublisher.publishReaction: userPubkey=${userPubkey.take(8)}..., targetEvent=${targetEventId.take(8)}...")
+                
                 val reactionEvent = InteractionController.createReactionEvent(
                     targetEventId = targetEventId,
                     targetPubkey = targetPubkey,
@@ -33,6 +35,8 @@ object InteractionPublisher {
                     userPubkey = userPubkey,
                     relayUrl = relayUrl
                 )
+                
+                println("📝 Created reaction event with pubkey=${reactionEvent.pubkey.take(8)}...")
                 
                 signAndPublish(reactionEvent.toJson().toString())
             } catch (e: Exception) {
@@ -57,6 +61,8 @@ object InteractionPublisher {
                 val userPubkey = KeyStoreManager.getPubkeyHex()
                     ?: throw Exception("No pubkey available")
                 
+                println("🎯 InteractionPublisher.publishReply: userPubkey=${userPubkey.take(8)}..., replyToEvent=${replyToEventId.take(8)}...")
+                
                 val replyEvent = InteractionController.createReplyEvent(
                     content = content,
                     replyToEventId = replyToEventId,
@@ -64,6 +70,8 @@ object InteractionPublisher {
                     userPubkey = userPubkey,
                     relayUrl = relayUrl
                 )
+                
+                println("📝 Created reply event with pubkey=${replyEvent.pubkey.take(8)}...")
                 
                 signAndPublish(replyEvent.toJson().toString())
             } catch (e: Exception) {
@@ -88,6 +96,8 @@ object InteractionPublisher {
                 val userPubkey = KeyStoreManager.getPubkeyHex()
                     ?: throw Exception("No pubkey available")
                 
+                println("🎯 InteractionPublisher.publishRepost: userPubkey=${userPubkey.take(8)}..., targetEvent=${targetEventId.take(8)}...")
+                
                 val repostEvent = InteractionController.createRepostEvent(
                     targetEventId = targetEventId,
                     targetPubkey = targetPubkey,
@@ -95,6 +105,8 @@ object InteractionPublisher {
                     originalEventJson = originalEventJson,
                     relayUrl = relayUrl
                 )
+                
+                println("📝 Created repost event with pubkey=${repostEvent.pubkey.take(8)}...")
                 
                 signAndPublish(repostEvent.toJson().toString())
             } catch (e: Exception) {
@@ -118,13 +130,21 @@ object InteractionPublisher {
                 throw Exception("Event missing pubkey field")
             }
             
-            println("📝 InteractionPublisher: Signing event - Kind: ${unsignedEventJson.optInt("kind")}, ID: $eventId")
+            println("📝 InteractionPublisher.signAndPublish: eventPubkey=${userPubkey.take(8)}..., Kind: ${unsignedEventJson.optInt("kind")}, ID: ${eventId.take(8)}...")
             
             val isUsingAmber = KeyStoreManager.isUsingAmber()
+            println("🔑 Signing method: ${if (isUsingAmber) "Amber" else "nsec"}")
             
             if (isUsingAmber) {
                 // Sign with Amber (NIP-55)
                 try {
+                    // Verify configured pubkey matches event pubkey
+                    val configuredPubkey = AmberSignerManager.getConfiguredPubkey()
+                    println("🔍 Amber configured pubkey: ${configuredPubkey?.take(8)}..., Event pubkey: ${userPubkey.take(8)}...")
+                    if (configuredPubkey != userPubkey) {
+                        println("⚠️ WARNING: Pubkey mismatch! Configured: ${configuredPubkey?.take(8)}, Event: ${userPubkey.take(8)}")
+                    }
+                    
                     // Add ID to event for Amber
                     unsignedEventJson.put("id", eventId)
                     
@@ -136,7 +156,7 @@ object InteractionPublisher {
                     
                     // Parse the result - Amber returns the signature directly as hex string (not JSON)
                     if (!signResult.result.isNullOrBlank()) {
-                        val signature = signResult.result!!  // Direct hex string from Amber
+                        val signature = signResult.result  // Direct hex string from Amber
                         
                         if (signature.isNotBlank()) {
                             println("✅ InteractionPublisher: Signed with Amber - Sig: ${signature.take(20)}")
@@ -145,6 +165,8 @@ object InteractionPublisher {
                             val signedJson = unsignedEventJson.apply {
                                 put("sig", signature)
                             }
+                            
+                            println("📤 Publishing event to relays: pubkey=${signedJson.optString("pubkey").take(8)}..., id=${signedJson.optString("id").take(8)}...")
                             
                             // Publish to relays as JSON event
                             val eventMessage = """["EVENT",${signedJson}]"""

@@ -25,6 +25,8 @@ object NostrEventSigner {
     ): String {
         require(privKeyBytes.size == 32) { "Private key must be 32 bytes" }
         
+        println("🔏 NostrEventSigner.signEvent: Signing with nsec - pubkey=${pubkeyHex.take(8)}..., kind=$kind")
+        
         val createdAt = System.currentTimeMillis() / 1000L
         
         // Build event serialization for hashing according to NIP-01
@@ -41,7 +43,7 @@ object NostrEventSigner {
         val hash = MessageDigest.getInstance("SHA-256").digest(eventBytes)
         val eventId = hash.toHex()
         
-        // Note: Logging removed for security - event IDs can be correlated to users
+        println("✅ NostrEventSigner: Generated eventId=${eventId.take(8)}...")
         
         // Sign the hash using BIP-340 Schnorr
         val signature = schnorrSign(hash, privKeyBytes)
@@ -115,6 +117,8 @@ object NostrEventSigner {
         val content = jsonObj.optString("content", "")
         val tagsArray = jsonObj.optJSONArray("tags")
         
+        println("🔢 NostrEventSigner.calculateEventId: pubkey=${pubkey.take(8)}..., kind=$kind")
+        
         val tags = mutableListOf<List<String>>()
         if (tagsArray != null) {
             for (i in 0 until tagsArray.length()) {
@@ -134,7 +138,11 @@ object NostrEventSigner {
         
         val eventBytes = serialized.toByteArray(StandardCharsets.UTF_8)
         val hash = MessageDigest.getInstance("SHA-256").digest(eventBytes)
-        return hash.toHex()
+        val eventId = hash.toHex()
+        
+        println("🔢 Calculated eventId=${eventId.take(8)}...")
+        
+        return eventId
     }
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

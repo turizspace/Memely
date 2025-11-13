@@ -29,6 +29,8 @@ object InteractionController {
         userPubkey: String,
         relayUrl: String? = null
     ): NostrEvent {
+        println("🏗️ InteractionController.createReactionEvent: userPubkey=${userPubkey.take(8)}..., targetEvent=${targetEventId.take(8)}...")
+        
         val now = Instant.now().epochSecond
         
         // Build tags array
@@ -58,13 +60,17 @@ object InteractionController {
         clientTag.put("Memely")
         tags.put(clientTag)
         
-        return NostrEvent(
+        val event = NostrEvent(
             kind = 7,
             content = content,
             tags = tags,
             createdAt = now,
             pubkey = userPubkey
         )
+        
+        println("✅ Created reaction event - pubkey field set to: ${event.pubkey.take(8)}...")
+        
+        return event
     }
     
     /**

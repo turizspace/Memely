@@ -33,16 +33,33 @@ class MainActivity : ComponentActivity() {
     private val amberLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        result.data?.let {
-            AmberSignerManager.handleIntentResponse(it)
-            val pubkey = it.getStringExtra("result")
-            val packageName = it.getStringExtra("package") ?: "com.greenart7c3.nostrsigner"
-            if (!pubkey.isNullOrBlank()) {
+        result.data?.let { intent ->
+            println("🔄 MainActivity: Amber launcher callback received")
+            
+            // Get the request ID to determine if this was a login or signing request
+            val requestId = intent.getStringExtra("id")
+            val isLogin = requestId != null && AmberSignerManager.isLoginRequest(requestId)
+            
+            println("🔍 MainActivity: Request ID=$requestId, isLogin=$isLogin")
+            
+            // Let AmberSignerManager handle the response (it manages pending requests)
+            AmberSignerManager.handleIntentResponse(intent)
+            
+            val pubkey = intent.getStringExtra("result")
+            val packageName = intent.getStringExtra("package") ?: "com.greenart7c3.nostrsigner"
+            
+            println("🔑 MainActivity: Amber callback - pubkey=${pubkey?.take(8)}..., package=$packageName")
+            
+            // Only save pubkey if this is a LOGIN request
+            if (isLogin && !pubkey.isNullOrBlank()) {
+                println("✅ MainActivity: This is a LOGIN response - saving pubkey")
                 KeyStoreManager.saveExternalPubkey(pubkey)
                 KeyStoreManager.saveAmberPackageName(packageName)
                 AmberSignerManager.configure(pubkey, packageName)
+                com.memely.nostr.AuthStateManager.refresh()
+            } else if (!isLogin) {
+                println("ℹ️ MainActivity: This is a SIGNING response - NOT updating stored pubkey")
             }
-            com.memely.nostr.AuthStateManager.refresh()
         }
     }
 
@@ -61,9 +78,12 @@ class MainActivity : ComponentActivity() {
         if (KeyStoreManager.isUsingAmber()) {
             val pubkey = KeyStoreManager.getPubkeyHex()
             val packageName = KeyStoreManager.getAmberPackageName()
+            println("🔄 MainActivity.onCreate: Restoring Amber config - pubkey=${pubkey?.take(8)}..., package=$packageName")
             if (pubkey != null && packageName != null) {
                 AmberSignerManager.configure(pubkey, packageName)
-                SecureLog.d("Restored external signer config")
+                println("✅ MainActivity: Restored external signer config")
+            } else {
+                println("⚠️ MainActivity: isUsingAmber=true but missing pubkey or package!")
             }
         }
 
@@ -87,20 +107,34 @@ class MainActivity : ComponentActivity() {
 
     private fun handleAmberCallback(intent: Intent?) {
         if (intent?.scheme == "nostrsigner") {
-            SecureLog.d("Received nostrsigner callback")
+            println("🔗 MainActivity: Received nostrsigner callback intent")
             // Validate intent before processing (security check)
             if (validateAmberIntent(intent)) {
+                // Get the request ID to determine if this was a login or signing request
+                val requestId = intent.getStringExtra("id")
+                val isLogin = requestId != null && AmberSignerManager.isLoginRequest(requestId)
+                
+                println("🔍 MainActivity: Callback Request ID=$requestId, isLogin=$isLogin")
+                
                 AmberSignerManager.handleIntentResponse(intent)
+                
                 val pubkey = intent.getStringExtra("result")
                 val packageName = intent.getStringExtra("package") ?: "com.greenart7c3.nostrsigner"
-                if (!pubkey.isNullOrBlank()) {
+                
+                println("🔑 MainActivity: Callback - pubkey=${pubkey?.take(8)}..., package=$packageName")
+                
+                // Only update stored pubkey on actual login (get_public_key), not on signing responses
+                if (isLogin && !pubkey.isNullOrBlank()) {
+                    println("✅ MainActivity: This is a LOGIN callback - saving pubkey")
                     KeyStoreManager.saveExternalPubkey(pubkey)
                     KeyStoreManager.saveAmberPackageName(packageName)
                     AmberSignerManager.configure(pubkey, packageName)
+                    com.memely.nostr.AuthStateManager.refresh()
+                } else if (!isLogin) {
+                    println("ℹ️ MainActivity: This is a SIGNING callback - NOT updating stored pubkey")
                 }
-                com.memely.nostr.AuthStateManager.refresh()
             } else {
-                SecureLog.w("Invalid nostrsigner intent received - ignoring")
+                println("⚠️ Invalid nostrsigner intent received - ignoring")
             }
         }
     }

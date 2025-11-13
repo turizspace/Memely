@@ -2,6 +2,8 @@ package com.memely.nostr
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import com.memely.utils.SecureJsonParser
@@ -27,32 +29,24 @@ object NostrRepository {
     private var hasRealMetadata = false
     private var isInitialConnectionDone = false
     
-    // FIX: Track connection state to prevent duplicates
-    private var isConnecting = false
+    // FIX: Track connection state to prevent duplicates using a Mutex
+    private val connectMutex = Mutex()
     private var lastConnectedRelays: List<String> = emptyList()
 
     suspend fun connectAll() {
         val currentRelays = RelayManager.effectiveRelays.value
-        
-        // FIX: Prevent duplicate connections to same relays
-        if (isConnecting) {
-            SecureLog.d("NostrRepository: Already connecting, skipping")
-            return
-        }
-        
-        if (currentRelays.sorted() == lastConnectedRelays.sorted()) {
-            SecureLog.d("NostrRepository: Already connected to these relays, skipping")
-            return
-        }
-        
-        isConnecting = true
-        try {
-            SecureLog.d("NostrRepository: Connecting to ${currentRelays.size} relays: ${currentRelays.take(3)}...")
+
+        // Use a Mutex to prevent concurrent connectAll executions which could double-connect
+        connectMutex.withLock {
+            if (currentRelays.sorted() == lastConnectedRelays.sorted()) {
+                println("NostrRepository: Already connected to these relays, skipping")
+                return@withLock
+            }
+
+            println("NostrRepository: Connecting to ${currentRelays.size} relays: ${currentRelays.take(3)}...")
             relayPool.updateRelays(currentRelays)
             lastConnectedRelays = currentRelays
             isInitialConnectionDone = true
-        } finally {
-            isConnecting = false
         }
     }
 

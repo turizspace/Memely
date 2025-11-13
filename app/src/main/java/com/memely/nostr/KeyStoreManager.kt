@@ -54,7 +54,7 @@ object KeyStoreManager {
             pubkeyInput
         }
         secureStorage.putString("external_pubkey", pubHex)
-        // Note: Logging removed for security - pubkeys stored securely
+        println("🔐 KeyStore: Saved external pubkey (${pubHex.take(8)}...)")
     }
 
     fun saveAmberPackageName(packageName: String) {
@@ -66,10 +66,22 @@ object KeyStoreManager {
         return secureStorage.getString("amber_package")
     }
 
-    fun getPubkeyHex(): String? =
-        secureStorage.getString("pub_hex")
-            ?: secureStorage.getString("external_pubkey")
-            ?: inMemoryPubHex
+    fun getPubkeyHex(): String? {
+        val pubHex = secureStorage.getString("pub_hex")
+        val externalPubkey = secureStorage.getString("external_pubkey")
+        val inMemory = inMemoryPubHex
+        
+        val source = when {
+            pubHex != null -> "pub_hex"
+            externalPubkey != null -> "external_pubkey"
+            inMemory != null -> "inMemory"
+            else -> "NONE"
+        }
+        val result = pubHex ?: externalPubkey ?: inMemory
+        println("🔍 KeyStore: getPubkeyHex() -> source=$source, pubkey=${result?.take(8) ?: "null"}...")
+        
+        return result
+    }
 
     fun exportNpubBech32(): String? = getPubkeyHex()?.let { Nip19.encode("npub", it) }
 

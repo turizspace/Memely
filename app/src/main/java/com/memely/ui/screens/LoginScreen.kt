@@ -60,11 +60,11 @@ fun LoginScreen(
 
                             if (result.result != null) {
                                 val packageName = result.packageName ?: "com.greenart7c3.nostrsigner"
-                                AmberSignerManager.configure(result.result!!, packageName)
-                                KeyStoreManager.saveExternalPubkey(result.result!!)
+                                AmberSignerManager.configure(result.result, packageName)
+                                KeyStoreManager.saveExternalPubkey(result.result)
                                 KeyStoreManager.saveAmberPackageName(packageName)
                                 android.util.Log.d("MemelyLogin", "✅ Amber login successful. Pubkey: ${result.result}, Package: $packageName")
-                                status = "✅ Amber login successful\nPubkey: ${result.result!!.take(12)}…"
+                                status = "✅ Amber login successful\nPubkey: ${result.result.take(12)}…"
                                 onLoggedIn()
                             } else {
                                 status = "❌ Amber did not return a pubkey."

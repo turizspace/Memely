@@ -19,6 +19,9 @@ object AmberSignerManager {
 
     // Keep public for coroutine waiting
     val pending = ConcurrentHashMap<String, CompletableDeferred<IntentResult>>()
+    
+    // Track request types to distinguish login from signing
+    private val requestTypes = ConcurrentHashMap<String, String>()
 
     data class IntentResult(
         val id: String? = null,
@@ -42,6 +45,8 @@ object AmberSignerManager {
             val result = intent.getStringExtra("result")
             val event = intent.getStringExtra("event")
             val pkg = intent.getStringExtra("package")
+            
+            println("📨 AmberSignerManager: Received intent response - id=${id?.take(8)}, hasResult=${!result.isNullOrBlank()}, hasEvent=${!event.isNullOrBlank()}, pkg=$pkg")
             
             // Validate ID exists and is expected
             if (id.isNullOrBlank()) {
@@ -75,23 +80,31 @@ object AmberSignerManager {
                 val deferred = pending.remove(id)
                 if (deferred != null) {
                     deferred.complete(res)
-                    SecureLog.d("Completed pending request: ${id.take(8)}")
+                    println("✅ Completed pending request: ${id.take(8)}")
                 } else {
-                    SecureLog.w("Received response for unknown request ID: ${id.take(8)}")
+                    println("⚠️ Received response for unknown request ID: ${id.take(8)}")
                 }
             }
         } catch (e: Exception) {
-            SecureLog.e("Error handling intent response", e)
+            println("❌ Error handling intent response: ${e.message}")
         }
     }
 
     fun configure(pubkeyHex: String, packageName: String) {
         externalPubkey = pubkeyHex
         externalPackage = packageName
+        println("🔧 AmberSignerManager: Configured with pubkey=${pubkeyHex.take(8)}..., package=$packageName")
     }
 
     fun getConfiguredPubkey(): String? = externalPubkey
     fun getConfiguredPackage(): String? = externalPackage
+    
+    /**
+     * Check if a request ID was for login (get_public_key)
+     */
+    fun isLoginRequest(requestId: String): Boolean {
+        return requestTypes[requestId] == "get_public_key"
+    }
 
     suspend fun requestPublicKey(timeoutMs: Long = 60_000): IntentResult {
         val pkg = "com.greenart7c3.nostrsigner" // Amber package
@@ -100,6 +113,7 @@ object AmberSignerManager {
         val callId = java.util.UUID.randomUUID().toString().replace("-", "").take(32)
         val deferred = CompletableDeferred<IntentResult>()
         pending[callId] = deferred
+        requestTypes[callId] = "get_public_key"  // Mark as login request
 
         val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("nostrsigner:")).apply {
             putExtra("type", "get_public_key")
@@ -115,6 +129,7 @@ object AmberSignerManager {
             withTimeout(timeoutMs) { deferred.await() }
         } finally {
             pending.remove(callId)
+            requestTypes.remove(callId)  // Clean up
         }
     }
 
@@ -123,11 +138,26 @@ object AmberSignerManager {
         val pub = externalPubkey ?: throw IllegalStateException("Amber pubkey not set")
         val l = launcher ?: throw IllegalStateException("No launcher registered")
 
+        println("🔏 AmberSignerManager.signEvent() called - configuredPubkey=${pub.take(8)}..., eventId=${eventId.take(8)}...")
+        
+        // Parse event JSON to check the pubkey in the event
+        try {
+            val eventObj = org.json.JSONObject(eventJson)
+            val eventPubkey = eventObj.optString("pubkey", "")
+            println("📋 Event pubkey in JSON: ${eventPubkey.take(8)}... (matches configured: ${eventPubkey == pub})")
+            if (eventPubkey != pub) {
+                println("⚠️⚠️⚠️ PUBKEY MISMATCH DETECTED! Event: ${eventPubkey.take(8)}, Configured: ${pub.take(8)}")
+            }
+        } catch (e: Exception) {
+            println("⚠️ Could not parse event JSON to check pubkey: ${e.message}")
+        }
+
         val callId = java.util.UUID.randomUUID().toString().replace("-", "").take(32)
         val deferred = CompletableDeferred<IntentResult>()
         pending[callId] = deferred
+        requestTypes[callId] = "sign_event"  // Mark as signing request
 
-        SecureLog.d("Sending event to external signer (ID: ${SecureLog.truncateHex(eventId)})")
+        println("📤 Sending event to external signer (ID: ${eventId.take(8)}...)")
 
         // Attach unsigned event JSON directly in the URI per NIP-55 and mirror amber login flow
         val uri = android.net.Uri.parse("nostrsigner:$eventJson")
@@ -140,20 +170,21 @@ object AmberSignerManager {
             addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
 
-        SecureLog.d("Launching external signer for event signing")
+        println("🚀 Launching external signer for event signing")
 
         l(intent)
 
         return try {
-            SecureLog.d("Waiting for signer response (timeout: ${timeoutMs}ms)")
+            println("⏳ Waiting for signer response (timeout: ${timeoutMs}ms)")
             val response = withTimeout(timeoutMs) { deferred.await() }
-            SecureLog.d("Received response from signer")
+            println("✅ Received response from signer")
             response
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            SecureLog.w("Timeout waiting for signer response")
+            println("⏱️ Timeout waiting for signer response")
             throw e
         } finally {
             pending.remove(callId)
+            requestTypes.remove(callId)  // Clean up
         }
     }
 }
