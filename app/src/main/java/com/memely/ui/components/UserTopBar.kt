@@ -34,9 +34,6 @@ fun UserTopBar(
     // Collect metadata directly from NostrRepository (same source as ProfileScreen)
     val userMetadata by NostrRepository.metadataState.collectAsState()
     
-    // Debug current state
-    println("📱 UserTopBar RENDERING - metadata: '${userMetadata?.name ?: "NULL"}'")
-    
     TopAppBar(
         modifier = modifier.fillMaxWidth(),
         backgroundColor = MaterialTheme.colors.surface,
