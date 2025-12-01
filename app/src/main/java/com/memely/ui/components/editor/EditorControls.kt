@@ -246,24 +246,46 @@ fun EditorControls(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.width(IntrinsicSize.Max)
                 ) {
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .size(40.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colors.surface)
+                            .background(MaterialTheme.colors.surface),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Slider in a box
-                        Slider(
-                            value = outlineWidth.value,
-                            onValueChange = { value ->
-                                onOutlineWidthChange(androidx.compose.ui.unit.Dp(value))
+                        // Decrease button
+                        IconButton(
+                            onClick = {
+                                val newValue = (outlineWidth.value - 1f).coerceAtLeast(0f)
+                                onOutlineWidthChange(androidx.compose.ui.unit.Dp(newValue))
                             },
-                            valueRange = 0f..12f,
-                            steps = 11,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Text("-", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                        
+                        // Value display
+                        Text(
+                            text = outlineWidth.value.toInt().toString(),
                             modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(4.dp)
+                                .width(24.dp)
+                                .align(Alignment.CenterVertically),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colors.onSurface,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
+                        
+                        // Increase button
+                        IconButton(
+                            onClick = {
+                                val newValue = (outlineWidth.value + 1f).coerceAtMost(4f)
+                                onOutlineWidthChange(androidx.compose.ui.unit.Dp(newValue))
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                     Text(
                         text = "Outline",
