@@ -9,4 +9,3 @@ remote_metadata:
   - github
 assets:
   - '.*\.apk'
-  - '.*\.aab'
