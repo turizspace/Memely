@@ -285,43 +285,56 @@ object MemeFileSaver {
                 }
                 
                 // COORDINATE SYSTEM:
-                // text.position.x/y = screen/canvas coordinates (where user placed it)
-                // This is the offset applied to the Box, BEFORE padding
-                // imageOffsetX/Y = where the image is centered in the canvas
-                // To get image coordinates: position - imageOffset
+                // text.position.x/y = screen/canvas coordinates (where user placed the OUTER Box)
+                // The TextLayerBox has padding(8.dp) INSIDE the graphicsLayer transforms
+                // This means the actual text content starts at position + 8.dp (in display space)
+                // But padding is applied BEFORE scale, so we need to add the padding amount
+                
+                val textPaddingDisplayPx = 8f * density  // Match the 8.dp from TextLayerBox
                 
                 val posRelativeToImage = Offset(
-                    text.position.x - imageOffsetX,
-                    text.position.y - imageOffsetY
+                    text.position.x - imageOffsetX + textPaddingDisplayPx,
+                    text.position.y - imageOffsetY + textPaddingDisplayPx
                 )
-                
-                // DO NOT add padding here - the padding in TextLayerBox is internal
-                // and text.position is already set at the correct visual location
                 
                 // Now scale to original image coordinates using separate X/Y scales
                 // Also apply user's scale transform to match graphicsLayer scaling
                 val scaledX = posRelativeToImage.x * scaleX
                 val scaledY = posRelativeToImage.y * scaleY
 
-                // Create final paint with full scale applied
-                // Apply text.scale (user's gesture scale) and scaleX (display to image scale)
+                // Create final paint - USE ONLY BASE SIZE, NOT SCALED
+                // The canvas.scale() will handle the scaling transformation
                 val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = text.color.toArgb()
-                    textSize = textPaintForMeasure.textSize * text.scale * scaleX  // Base size * user scale * image scale
+                    textSize = textPaintForMeasure.textSize * scaleX  // Only image scale, NOT user scale (canvas.scale will do that)
                     isFakeBoldText = true
                     style = Paint.Style.FILL
                     // Match the alignment from measure paint
                     textAlign = textPaintForMeasure.textAlign
                 }
 
+                // Dimensions in display/screen space (before any saves to disk scaling)
+                val unscaledTextWidth = textWidth  // Text width at base fontSize
+                val unscaledTotalTextHeight = totalTextHeight  // Total height of all lines
+                val unscaledLineHeight = lineHeight  // Height of one line
+                val unscaledBaselineOffset = baselineOffset  // Baseline offset
+                
+                // Calculate the center point of the text BEFORE scaling (for rotation center)
+                val unscaledCenterX = unscaledTextWidth / 2f
+                val unscaledCenterY = unscaledTotalTextHeight / 2f
+                
+                // Scale these to image coordinates for the rotation center
+                val scaledUnscaledCenterX = unscaledCenterX * scaleX
+                val scaledUnscaledCenterY = unscaledCenterY * scaleY
+                
                 // Calculate scaled dimensions for rotation center
-                // Apply both user scale and image scale
-                val scaledTextWidth = textWidth * text.scale * scaleX
-                val scaledTotalTextHeight = totalTextHeight * text.scale * scaleY
+                // Apply only image scale (NOT user scale, that's done by canvas.scale())
+                val scaledTextWidth = unscaledTextWidth * scaleX
+                val scaledTotalTextHeight = unscaledTotalTextHeight * scaleY
 
                 // Calculate the line height in the final scaled space
-                val scaledLineHeight = lineHeight * text.scale * scaleY
-                val scaledBaselineOffset = baselineOffset * text.scale * scaleY
+                val scaledLineHeight = unscaledLineHeight * scaleY
+                val scaledBaselineOffset = unscaledBaselineOffset * scaleY
 
                 // Log computed values for debugging alignment
                 println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -336,30 +349,38 @@ object MemeFileSaver {
                 println("  ⚠️ ACTUAL in saved image: text content starts at (${scaledX}, ${scaledY})")
                 println("  User Scale: ${text.scale}x, Rotation: ${text.rotation}°")
                 println("  Display Font Size (base): ${textPaintForMeasure.textSize}px")
-                println("  Final Font Size (with scales): ${textPaint.textSize}px")
-                println("  Text Dimensions (display, base): ${textWidth}x${totalTextHeight}px")
-                println("  Text Dimensions (final, scaled): ${scaledTextWidth}x${scaledTotalTextHeight}px")
-                println("  Rotation Center: (${scaledTextWidth / 2f}, ${scaledTotalTextHeight / 2f})")
+                println("  Final Font Size (image scaled): ${textPaint.textSize}px")
+                println("  Text Dimensions (unscaled): ${unscaledTextWidth}x${unscaledTotalTextHeight}px")
+                println("  Text Dimensions (image scaled): ${scaledTextWidth}x${scaledTotalTextHeight}px")
+                println("  Unscaled Center: (${unscaledCenterX}, ${unscaledCenterY})")
+                println("  Image-Scaled Center for rotation: (${scaledUnscaledCenterX}, ${scaledUnscaledCenterY})")
                 println("  Lines: ${lines.size}, Max Width: ${maxTextWidthPx}px")
                 println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-                // Draw text rotated around its center to match Compose's graphicsLayer default transform origin
+                // Draw text: translate -> rotate around center -> apply user scale
+                // This matches Compose's graphicsLayer behavior: translate, rotate around center, then scale around center
                 canvas.save()
+                // Translate to the text's position on the final image
                 canvas.translate(scaledX, scaledY)
-                canvas.rotate(text.rotation, scaledTextWidth / 2f, scaledTotalTextHeight / 2f)
+                // Rotate around the text's center point
+                canvas.rotate(text.rotation, scaledUnscaledCenterX, scaledUnscaledCenterY)
+                // Apply user's scale transformation around the center
+                canvas.scale(text.scale, text.scale, scaledUnscaledCenterX, scaledUnscaledCenterY)
                 
                 // Calculate X offset based on text alignment
                 // Paint.Align handles the positioning: LEFT draws from x, CENTER from x-width/2, RIGHT from x-width
+                // Use unscaled maxWidth since canvas.scale() will handle the actual scaling
                 val alignmentX = when (textPaint.textAlign) {
                     Paint.Align.LEFT -> 0f
-                    Paint.Align.CENTER -> maxTextWidthPx * text.scale * scaleX / 2f  // Center within max width (with all scales)
-                    Paint.Align.RIGHT -> maxTextWidthPx * text.scale * scaleX  // Right-align to max width (with all scales)
+                    Paint.Align.CENTER -> maxTextWidthPx * scaleX / 2f  // Center within max width (image scaled only)
+                    Paint.Align.RIGHT -> maxTextWidthPx * scaleX  // Right-align to max width (image scaled only)
                     else -> 0f
                 }
                 
                 // Draw outline if configured
                 if (text.outlineWidth > 0.dp) {
-                    val outlineWidthPx = text.outlineWidth.value * density * text.scale * scaleX
+                    // Outline width is scaled by image scale (user scale will be applied by canvas.scale())
+                    val outlineWidthPx = text.outlineWidth.value * density * scaleX
                     val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = text.outlineColor.toArgb()
                         textSize = textPaint.textSize
@@ -388,7 +409,7 @@ object MemeFileSaver {
                     canvas.drawText(line, alignmentX, lineY, textPaint)
                 }
                 
-                canvas.restore()
+                canvas.restore()  // Restore canvas state (removes translate + rotate + scale)
             }
 
             // Save to device using scoped storage (Android 10+) or legacy storage (pre-Android 10)
