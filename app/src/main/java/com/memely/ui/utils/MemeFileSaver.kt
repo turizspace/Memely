@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
+import androidx.compose.ui.unit.dp
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.compose.ui.geometry.Offset
@@ -285,23 +286,22 @@ object MemeFileSaver {
                 
                 // COORDINATE SYSTEM:
                 // text.position.x/y = screen/canvas coordinates (where user placed it)
+                // This is the offset applied to the Box, BEFORE padding
                 // imageOffsetX/Y = where the image is centered in the canvas
                 // To get image coordinates: position - imageOffset
-                // Then add padding offset to account for the 8.dp internal padding
                 
                 val posRelativeToImage = Offset(
                     text.position.x - imageOffsetX,
                     text.position.y - imageOffsetY
                 )
                 
-                // Add padding offset (where text actually starts inside the box)
-                val adjustedX = posRelativeToImage.x + textPaddingPx
-                val adjustedY = posRelativeToImage.y + textPaddingPx
+                // DO NOT add padding here - the padding in TextLayerBox is internal
+                // and text.position is already set at the correct visual location
                 
                 // Now scale to original image coordinates using separate X/Y scales
                 // Also apply user's scale transform to match graphicsLayer scaling
-                val scaledX = adjustedX * scaleX
-                val scaledY = adjustedY * scaleY
+                val scaledX = posRelativeToImage.x * scaleX
+                val scaledY = posRelativeToImage.y * scaleY
 
                 // Create final paint with full scale applied
                 // Apply text.scale (user's gesture scale) and scaleX (display to image scale)
@@ -330,8 +330,6 @@ object MemeFileSaver {
                 println("  Screen Position: (${text.position.x}, ${text.position.y})")
                 println("  Image Offset: (${imageOffsetX}, ${imageOffsetY})")
                 println("  Relative to Image: (${posRelativeToImage.x}, ${posRelativeToImage.y})")
-                println("  Padding: ${textPaddingPx}px (8dp * density, fixed)")
-                println("  Adjusted (with padding): (${adjustedX}, ${adjustedY})")
                 println("  Scale Factors: scaleX=${scaleX}, scaleY=${scaleY}, userScale=${text.scale}")
                 println("  Scaled to Image: (${scaledX}, ${scaledY})")
                 println("  ⚠️ EXPECTED in editor: text box outer edge at (${text.position.x}, ${text.position.y})")
@@ -357,6 +355,31 @@ object MemeFileSaver {
                     Paint.Align.CENTER -> maxTextWidthPx * text.scale * scaleX / 2f  // Center within max width (with all scales)
                     Paint.Align.RIGHT -> maxTextWidthPx * text.scale * scaleX  // Right-align to max width (with all scales)
                     else -> 0f
+                }
+                
+                // Draw outline if configured
+                if (text.outlineWidth > 0.dp) {
+                    val outlineWidthPx = text.outlineWidth.value * density * text.scale * scaleX
+                    val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = text.outlineColor.toArgb()
+                        textSize = textPaint.textSize
+                        textAlign = textPaint.textAlign
+                        style = Paint.Style.FILL
+                    }
+                    
+                    // Draw outline text multiple times with offset
+                    for (offsetX in -1..1) {
+                        for (offsetY in -1..1) {
+                            if (offsetX != 0 || offsetY != 0) {
+                                val outlineOffsetX = offsetX * (outlineWidthPx / 2f)
+                                val outlineOffsetY = offsetY * (outlineWidthPx / 2f)
+                                lines.forEachIndexed { lineIndex, line ->
+                                    val lineY = lineIndex * scaledLineHeight + scaledBaselineOffset
+                                    canvas.drawText(line, alignmentX + outlineOffsetX, lineY + outlineOffsetY, outlinePaint)
+                                }
+                            }
+                        }
+                    }
                 }
                 
                 // Draw each line using the final paint (with alignment)

@@ -80,43 +80,148 @@ fun TextLayerBox(
             }
     ) {
         if (text.selected) {
-            BasicTextField(
-                value = textValue,
-                onValueChange = {
-                    textValue = it
-                    onTextChange(it)
-                },
-                textStyle = TextStyle(
-                    color = text.color,
-                    fontSize = text.fontSize, // No scale multiplication - handled by graphicsLayer
-                    fontFamily = text.fontFamily,
-                    fontWeight = text.fontWeight,
-                    fontStyle = text.fontStyle,
-                    textAlign = text.textAlign
-                ),
-                modifier = Modifier
-                    .widthIn(max = text.maxWidth) // No scale multiplication
-                    .wrapContentSize(),
-                singleLine = false,
-                maxLines = Int.MAX_VALUE,
-                decorationBox = { inner -> inner() }
-            )
+            // Show outline while editing
+            if (text.outlineWidth > 0.dp) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(max = text.maxWidth)
+                        .wrapContentSize()
+                ) {
+                    // Draw outline by rendering text multiple times with offsets
+                    for (offsetX in -1..1) {
+                        for (offsetY in -1..1) {
+                            if (offsetX != 0 || offsetY != 0) {
+                                BasicTextField(
+                                    value = textValue,
+                                    onValueChange = {}, // Read-only outline
+                                    textStyle = TextStyle(
+                                        color = text.outlineColor,
+                                        fontSize = text.fontSize,
+                                        fontFamily = text.fontFamily,
+                                        fontWeight = text.fontWeight,
+                                        fontStyle = text.fontStyle,
+                                        textAlign = text.textAlign
+                                    ),
+                                    modifier = Modifier.offset(
+                                        x = (offsetX * text.outlineWidth.value / 2).dp,
+                                        y = (offsetY * text.outlineWidth.value / 2).dp
+                                    ),
+                                    singleLine = false,
+                                    maxLines = Int.MAX_VALUE,
+                                    decorationBox = { inner -> inner() },
+                                    enabled = false
+                                )
+                            }
+                        }
+                    }
+                    // Main text field on top
+                    BasicTextField(
+                        value = textValue,
+                        onValueChange = {
+                            textValue = it
+                            onTextChange(it)
+                        },
+                        textStyle = TextStyle(
+                            color = text.color,
+                            fontSize = text.fontSize,
+                            fontFamily = text.fontFamily,
+                            fontWeight = text.fontWeight,
+                            fontStyle = text.fontStyle,
+                            textAlign = text.textAlign
+                        ),
+                        modifier = Modifier
+                            .widthIn(max = text.maxWidth)
+                            .wrapContentSize(),
+                        singleLine = false,
+                        maxLines = Int.MAX_VALUE,
+                        decorationBox = { inner -> inner() }
+                    )
+                }
+            } else {
+                BasicTextField(
+                    value = textValue,
+                    onValueChange = {
+                        textValue = it
+                        onTextChange(it)
+                    },
+                    textStyle = TextStyle(
+                        color = text.color,
+                        fontSize = text.fontSize, // No scale multiplication - handled by graphicsLayer
+                        fontFamily = text.fontFamily,
+                        fontWeight = text.fontWeight,
+                        fontStyle = text.fontStyle,
+                        textAlign = text.textAlign
+                    ),
+                    modifier = Modifier
+                        .widthIn(max = text.maxWidth) // No scale multiplication
+                        .wrapContentSize(),
+                    singleLine = false,
+                    maxLines = Int.MAX_VALUE,
+                    decorationBox = { inner -> inner() }
+                )
+            }
         } else {
-            Text(
-                text = text.text,
-                style = TextStyle(
-                    color = text.color,
-                    fontSize = text.fontSize, // No scale multiplication - handled by graphicsLayer
-                    fontFamily = text.fontFamily,
-                    fontWeight = text.fontWeight,
-                    fontStyle = text.fontStyle,
-                    textAlign = text.textAlign
-                ),
-                modifier = Modifier
-                    .widthIn(max = text.maxWidth) // No scale multiplication
-                    .wrapContentSize(),
-                maxLines = Int.MAX_VALUE
-            )
+            // Display text with optional outline by layering multiple text composables
+            if (text.outlineWidth > 0.dp) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(max = text.maxWidth)
+                        .wrapContentSize()
+                ) {
+                    // Draw outline by rendering text multiple times with offsets
+                    for (offsetX in -1..1) {
+                        for (offsetY in -1..1) {
+                            if (offsetX != 0 || offsetY != 0) {
+                                Text(
+                                    text = text.text,
+                                    style = TextStyle(
+                                        color = text.outlineColor,
+                                        fontSize = text.fontSize,
+                                        fontFamily = text.fontFamily,
+                                        fontWeight = text.fontWeight,
+                                        fontStyle = text.fontStyle,
+                                        textAlign = text.textAlign
+                                    ),
+                                    modifier = Modifier.offset(
+                                        x = offsetX.dp * (text.outlineWidth.value / 2),
+                                        y = offsetY.dp * (text.outlineWidth.value / 2)
+                                    ),
+                                    maxLines = Int.MAX_VALUE
+                                )
+                            }
+                        }
+                    }
+                    // Draw the main text on top
+                    Text(
+                        text = text.text,
+                        style = TextStyle(
+                            color = text.color,
+                            fontSize = text.fontSize,
+                            fontFamily = text.fontFamily,
+                            fontWeight = text.fontWeight,
+                            fontStyle = text.fontStyle,
+                            textAlign = text.textAlign
+                        ),
+                        maxLines = Int.MAX_VALUE
+                    )
+                }
+            } else {
+                Text(
+                    text = text.text,
+                    style = TextStyle(
+                        color = text.color,
+                        fontSize = text.fontSize,
+                        fontFamily = text.fontFamily,
+                        fontWeight = text.fontWeight,
+                        fontStyle = text.fontStyle,
+                        textAlign = text.textAlign
+                    ),
+                    modifier = Modifier
+                        .widthIn(max = text.maxWidth)
+                        .wrapContentSize(),
+                    maxLines = Int.MAX_VALUE
+                )
+            }
         }
     }
 }

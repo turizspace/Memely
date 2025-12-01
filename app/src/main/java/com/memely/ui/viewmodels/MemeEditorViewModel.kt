@@ -25,7 +25,9 @@ data class MemeText(
     var fontStyle: androidx.compose.ui.text.font.FontStyle = androidx.compose.ui.text.font.FontStyle.Normal,
     var textAlign: androidx.compose.ui.text.style.TextAlign = androidx.compose.ui.text.style.TextAlign.Center,
     var maxWidth: androidx.compose.ui.unit.Dp = 300.dp,  // Max width for text wrapping in dp
-    var measuredWidthPx: Float = 0f  // Actual measured width in pixels (used for accurate save)
+    var measuredWidthPx: Float = 0f,  // Actual measured width in pixels (used for accurate save)
+    var outlineWidth: androidx.compose.ui.unit.Dp = 0.dp,  // Text outline/stroke width
+    var outlineColor: Color = Color.Black  // Outline color (default black for contrast)
 )
 
 data class MemeOverlayImage(
@@ -227,6 +229,26 @@ class MemeEditorViewModel {
             if (selectedIsText) {
                 texts = texts.mapIndexed { i, t ->
                     if (i == idx) t.copy(textAlign = textAlign) else t
+                }
+            }
+        }
+    }
+    
+    fun updateSelectedTextOutlineWidth(outlineWidth: androidx.compose.ui.unit.Dp) {
+        selectedLayerIndex?.let { idx ->
+            if (selectedIsText) {
+                texts = texts.mapIndexed { i, t ->
+                    if (i == idx) t.copy(outlineWidth = outlineWidth) else t
+                }
+            }
+        }
+    }
+    
+    fun updateSelectedTextOutlineColor(outlineColor: Color) {
+        selectedLayerIndex?.let { idx ->
+            if (selectedIsText) {
+                texts = texts.mapIndexed { i, t ->
+                    if (i == idx) t.copy(outlineColor = outlineColor) else t
                 }
             }
         }

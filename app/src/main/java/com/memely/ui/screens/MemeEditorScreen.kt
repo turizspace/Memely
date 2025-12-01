@@ -391,7 +391,9 @@ fun MemeEditorScreen(
                         // When the controls are laid out, re-register all tutorial targets
                         // to ensure their positions are correctly captured.
                         TutorialTargetRegistry.repositionAllTargets()
-                    }
+                    },
+                    outlineWidth = viewModel.getSelectedText()?.outlineWidth ?: 0.dp,
+                    onOutlineWidthChange = { viewModel.updateSelectedTextOutlineWidth(it) }
                 )
             }
         ) { paddingValues ->

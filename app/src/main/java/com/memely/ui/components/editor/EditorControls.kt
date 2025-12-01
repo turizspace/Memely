@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,7 +80,9 @@ fun EditorControls(
     onShowImageEditing: (() -> Unit)? = null,
     selectedIsText: Boolean = false,
     selectedIsImage: Boolean = false,
-    onGloballyPositioned: (LayoutCoordinates) -> Unit = {}
+    onGloballyPositioned: (LayoutCoordinates) -> Unit = {},
+    onOutlineWidthChange: ((androidx.compose.ui.unit.Dp) -> Unit)? = null,
+    outlineWidth: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     var showImageMenu by remember { mutableStateOf(false) }
 
@@ -235,6 +238,39 @@ fun EditorControls(
                     fontSize = 10.sp,
                     color = if (canDelete) MaterialTheme.colors.onSurface.copy(alpha = 0.7f) else MaterialTheme.colors.onSurface.copy(alpha = 0.3f)
                 )
+            }
+
+            // Outline width control (only for text)
+            if (selectedIsText && onOutlineWidthChange != null) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(IntrinsicSize.Max)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colors.surface)
+                    ) {
+                        // Slider in a box
+                        Slider(
+                            value = outlineWidth.value,
+                            onValueChange = { value ->
+                                onOutlineWidthChange(androidx.compose.ui.unit.Dp(value))
+                            },
+                            valueRange = 0f..12f,
+                            steps = 11,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(4.dp)
+                        )
+                    }
+                    Text(
+                        text = "Outline",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                    )
+                }
             }
         }
 
