@@ -1,6 +1,7 @@
 package com.memely.ui.screens
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -15,6 +16,8 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.rememberModalBottomSheetState
+import androidx.compose.material.AlertDialog
+import androidx.compose.material.Button
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -101,6 +104,32 @@ fun MemeEditorScreen(
     var isSavingToDevice by remember { mutableStateOf(false) }
     var uploadedImageUrl by remember { mutableStateOf<String?>(null) }
     var savedMemeFile by remember { mutableStateOf<File?>(null) }
+    var showExitConfirmation by remember { mutableStateOf(false) }
+    
+    // Track if any panel is currently open
+    val isPanelOpen = showColorPicker || showTextFormattingPanel || showImageEditingPanel || 
+                      showTemplateSelector || showComposeDialog || showRelayStatus
+    
+    // BackHandler to close panels before exiting editor
+    BackHandler(enabled = isPanelOpen) {
+        when {
+            showColorPicker -> showColorPicker = false
+            showTextFormattingPanel -> showTextFormattingPanel = false
+            showImageEditingPanel -> showImageEditingPanel = false
+            showTemplateSelector -> showTemplateSelector = false
+            showComposeDialog -> {
+                showComposeDialog = false
+                uploadedImageUrl = null
+                nostrPostViewModel.reset()
+            }
+            showRelayStatus -> showRelayStatus = false
+        }
+    }
+    
+    // BackHandler to show exit confirmation when no panels are open
+    BackHandler(enabled = !isPanelOpen) {
+        showExitConfirmation = true
+    }
 
     // Track Blossom upload state separately
     val blossomUploadState = blossomViewModel.uploadState
@@ -727,6 +756,32 @@ fun MemeEditorScreen(
                             showTemplateSelector = false
                         }
                     }
+                }
+            }
+        )
+    }
+    
+    // Exit confirmation dialog
+    if (showExitConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirmation = false },
+            title = { Text("Exit Meme Editor?") },
+            text = { Text("Are you sure you want to exit editing this meme? Any unsaved changes will be lost.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExitConfirmation = false
+                        onDone("")
+                    }
+                ) {
+                    Text("Discard")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showExitConfirmation = false }
+                ) {
+                    Text("Keep Editing")
                 }
             }
         )
