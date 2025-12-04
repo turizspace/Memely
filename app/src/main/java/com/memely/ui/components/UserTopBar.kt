@@ -18,21 +18,31 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.memely.nostr.KeyStoreManager
 import com.memely.nostr.MetadataParser
 import com.memely.nostr.NostrRepository
+import com.memely.ui.theme.ThemeManager
+import com.memely.ui.theme.ThemePreference
 
 @Composable
 fun UserTopBar(
     connectedRelays: Int,
     totalRelays: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onThemeChange: ((ThemePreference) -> Unit)? = null
 ) {
     // Collect metadata directly from NostrRepository (same source as ProfileScreen)
     val userMetadata by NostrRepository.metadataState.collectAsState()
+    val context = LocalContext.current
+    
+    // Load theme preference
+    var currentTheme by remember {
+        mutableStateOf(ThemeManager.getThemePreference(context))
+    }
     
     TopAppBar(
         modifier = modifier.fillMaxWidth(),
@@ -77,6 +87,18 @@ fun UserTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                // Theme toggle button
+                ThemeToggleButton(
+                    currentTheme = currentTheme,
+                    onThemeChange = { newTheme ->
+                        currentTheme = newTheme
+                        ThemeManager.saveThemePreference(context, newTheme)
+                        onThemeChange?.invoke(newTheme)
+                    },
+                    tint = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                )
+                
+                // Relay status
                 val isOnline = connectedRelays > 0
                 Icon(
                     imageVector = if (isOnline) Icons.Default.Cloud else Icons.Default.CloudOff,

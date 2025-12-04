@@ -163,6 +163,9 @@ fun AppRoot(openUrl: (Intent) -> Unit) {
     val context = LocalContext.current
     val loggedIn by com.memely.nostr.AuthStateManager.isLoggedIn.collectAsState()
     var isInitialized by remember { mutableStateOf(false) }
+    var currentTheme by remember {
+        mutableStateOf(com.memely.ui.theme.ThemeManager.getThemePreference(context))
+    }
     
     // Initialize TutorialManager
     LaunchedEffect(Unit) {
@@ -188,35 +191,54 @@ fun AppRoot(openUrl: (Intent) -> Unit) {
         return
     }
 
-    when {
-        !loggedIn -> {
-            LoginScreen(
-                onLoggedIn = {
-                    com.memely.nostr.AuthStateManager.refresh()
-                },
-                openUrl = openUrl
-            )
-        }
-        else -> {
-            AuthenticatedRoot(
-                onLogout = {
-                    // Clear all stored keys and credentials
-                    KeyStoreManager.clear()
-                    com.memely.nostr.AuthStateManager.refresh()
-                }
-            )
+    com.memely.ui.theme.MemelyTheme(
+        isDarkMode = com.memely.ui.theme.isDarkTheme(currentTheme)
+    ) {
+        when {
+            !loggedIn -> {
+                LoginScreen(
+                    onLoggedIn = {
+                        com.memely.nostr.AuthStateManager.refresh()
+                    },
+                    openUrl = openUrl
+                )
+            }
+            else -> {
+                AuthenticatedRoot(
+                    currentTheme = currentTheme,
+                    onThemeChange = { newTheme ->
+                        currentTheme = newTheme
+                    },
+                    onLogout = {
+                        // Clear all stored keys and credentials
+                        KeyStoreManager.clear()
+                        com.memely.nostr.AuthStateManager.refresh()
+                    }
+                )
+            }
         }
     }
 }
 
 @Composable
-fun AuthenticatedRoot(onLogout: () -> Unit = {}) {
+fun AuthenticatedRoot(
+    currentTheme: com.memely.ui.theme.ThemePreference = com.memely.ui.theme.ThemeManager.THEME_LIGHT,
+    onThemeChange: (com.memely.ui.theme.ThemePreference) -> Unit = {},
+    onLogout: () -> Unit = {}
+) {
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
     
     // Shared state for meme editor image URI - avoids navigation encoding issues
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    
+    // Theme state management
+    val context = LocalContext.current
+    var themeState by remember { 
+        mutableStateOf(currentTheme)
+    }
+    val isDarkMode = com.memely.ui.theme.isDarkTheme(themeState)
     
     // Get available templates for tutorial
     val availableTemplates by TemplateRepository.templatesFlow.collectAsState()
@@ -335,7 +357,12 @@ fun AuthenticatedRoot(onLogout: () -> Unit = {}) {
         topBar = {
             UserTopBar(
                 connectedRelays = connectedRelays,
-                totalRelays = totalRelays
+                totalRelays = totalRelays,
+                onThemeChange = { newTheme ->
+                    themeState = newTheme
+                    com.memely.ui.theme.ThemeManager.saveThemePreference(context, newTheme)
+                    onThemeChange(newTheme)
+                }
             )
         },
         bottomBar = {
