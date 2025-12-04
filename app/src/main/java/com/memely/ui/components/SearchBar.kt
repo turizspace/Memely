@@ -68,8 +68,7 @@ fun SearchBar(
             BasicTextField(
                 value = query,
                 onValueChange = onQueryChanged,
-                modifier = Modifier
-                    .fillMaxSize(),
+                
                 singleLine = true,
                 textStyle = MaterialTheme.typography.body2.copy(
                     color = MaterialTheme.colors.onSurface
