@@ -1,5 +1,6 @@
 package com.memely.data
 
+import android.content.Context
 import com.memely.network.SecureHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +44,32 @@ object TemplateRepository {
         
         val lowerQuery = query.lowercase()
         return allTemplates.filter { template ->
+            template.name.lowercase().contains(lowerQuery)
+        }
+    }
+    
+    /**
+     * Get only favorite templates
+     */
+    fun getFavoriteTemplates(context: Context): List<MemeTemplate> {
+        val favorites = FavoritesManager.getFavorites(context)
+        return _templatesFlow.value.filter { template ->
+            favorites.contains(template.url)
+        }
+    }
+    
+    /**
+     * Search within favorites
+     */
+    fun searchFavoriteTemplates(context: Context, query: String): List<MemeTemplate> {
+        val favorites = getFavoriteTemplates(context)
+        
+        if (query.isBlank()) {
+            return favorites
+        }
+        
+        val lowerQuery = query.lowercase()
+        return favorites.filter { template ->
             template.name.lowercase().contains(lowerQuery)
         }
     }

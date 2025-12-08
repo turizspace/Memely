@@ -9,25 +9,37 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.memely.data.FavoritesManager
 import com.memely.data.TemplateRepository
 import com.memely.ui.components.SearchBar
 import com.memely.ui.components.TemplateGrid
+import com.memely.ui.components.TemplateTab
+import com.memely.ui.components.TemplateTabBar
 
 @Composable
 fun TemplateSelectorDialog(
     onDismiss: () -> Unit,
     onTemplateSelected: (Uri) -> Unit
 ) {
+    val context = LocalContext.current
     val templates by TemplateRepository.templatesFlow.collectAsState()
     val isLoading by TemplateRepository.isLoadingFlow.collectAsState()
     val error by TemplateRepository.errorFlow.collectAsState()
+    val favorites by FavoritesManager.favoritesFlow.collectAsState()
     
     var searchQuery by remember { mutableStateOf("") }
-    val filteredTemplates = remember(templates, searchQuery) {
-        TemplateRepository.searchTemplates(searchQuery)
+    var selectedTab by remember { mutableStateOf(TemplateTab.ALL) }
+    
+    // Get templates based on selected tab - recomputes when favorites change
+    val displayedTemplates = remember(templates, selectedTab, searchQuery, favorites) {
+        when (selectedTab) {
+            TemplateTab.ALL -> TemplateRepository.searchTemplates(searchQuery)
+            TemplateTab.FAVORITES -> TemplateRepository.searchFavoriteTemplates(context, searchQuery)
+        }
     }
     
     // Fetch templates on first composition if not already loaded
@@ -36,6 +48,7 @@ fun TemplateSelectorDialog(
             println("📡 TemplateSelectorDialog: Fetching meme templates...")
             TemplateRepository.fetchTemplates()
         }
+        FavoritesManager.initialize(context)  // Initialize favorites from storage
     }
 
     Dialog(
@@ -77,17 +90,29 @@ fun TemplateSelectorDialog(
                     }
                 }
 
+                // Template tabs
+                TemplateTabBar(
+                    selectedTab = selectedTab,
+                    onTabSelected = { newTab ->
+                        selectedTab = newTab
+                        searchQuery = ""  // Reset search when changing tabs
+                    },
+                    favoritesCount = favorites.size
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 // Search bar
                 SearchBar(
                     query = searchQuery,
                     onQueryChanged = { searchQuery = it },
-                    placeholder = "Search templates...",
+                    placeholder = "Search ${selectedTab.name.lowercase()}...",
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
                 // Template grid
                 TemplateGrid(
-                    templates = filteredTemplates,
+                    templates = displayedTemplates,
                     isLoading = isLoading,
                     error = error,
                     modifier = Modifier.fillMaxSize(),

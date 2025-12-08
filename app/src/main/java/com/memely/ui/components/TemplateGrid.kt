@@ -19,7 +19,8 @@ fun TemplateGrid(
     isLoading: Boolean,
     error: String?,
     modifier: Modifier = Modifier,
-    onTemplateClick: (MemeTemplate) -> Unit
+    onTemplateClick: (MemeTemplate) -> Unit,
+    onFavoriteChanged: () -> Unit = {}
 ) {
     Box(
         modifier = modifier.fillMaxSize()
@@ -82,7 +83,10 @@ fun TemplateGrid(
                     items(templates) { template ->
                         TemplateCard(
                             template = template,
-                            onClick = onTemplateClick
+                            onClick = onTemplateClick,
+                            onFavoriteToggle = { _, _ ->
+                                onFavoriteChanged()
+                            }
                         )
                     }
                 }
