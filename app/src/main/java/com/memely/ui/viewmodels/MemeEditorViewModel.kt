@@ -23,7 +23,7 @@ data class MemeText(
     var fontFamily: androidx.compose.ui.text.font.FontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
     var fontWeight: androidx.compose.ui.text.font.FontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
     var fontStyle: androidx.compose.ui.text.font.FontStyle = androidx.compose.ui.text.font.FontStyle.Normal,
-    var textAlign: androidx.compose.ui.text.style.TextAlign = androidx.compose.ui.text.style.TextAlign.Center,
+    var textAlign: androidx.compose.ui.text.style.TextAlign = androidx.compose.ui.text.style.TextAlign.Start,
     var maxWidth: androidx.compose.ui.unit.Dp = 300.dp,  // Max width for text wrapping in dp
     var measuredWidthPx: Float = 0f,  // Actual measured width in pixels (used for accurate save)
     var outlineWidth: androidx.compose.ui.unit.Dp = 0.dp,  // Text outline/stroke width
