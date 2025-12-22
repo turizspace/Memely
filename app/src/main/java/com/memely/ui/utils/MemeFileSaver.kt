@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.IntSize
 import com.memely.network.SecureHttpClient
 import com.memely.ui.viewmodels.MemeOverlayImage
 import com.memely.ui.viewmodels.MemeText
+import com.memely.ui.fonts.FontCatalog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -236,12 +237,16 @@ object MemeFileSaver {
                 
                 val density = context.resources.displayMetrics.density
 
+                // Get the typeface for the selected font
+                val selectedTypeface = FontCatalog.getFontTypeface(text.fontFamily, context)
+                
                 // First paint at display scale to measure text dimensions in screen space
                 val textPaintForMeasure = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = text.color.toArgb()
                     textSize = text.fontSize.value * density  // Base fontSize only (scale handled separately)
-                    isFakeBoldText = true
+                    isFakeBoldText = text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold
                     style = Paint.Style.FILL
+                    typeface = selectedTypeface  // Apply selected font
                     // Convert Compose TextAlign to Paint.Align
                     textAlign = when (text.textAlign) {
                         androidx.compose.ui.text.style.TextAlign.Left,
@@ -307,8 +312,9 @@ object MemeFileSaver {
                 val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = text.color.toArgb()
                     textSize = textPaintForMeasure.textSize * scaleX  // Only image scale, NOT user scale (canvas.scale will do that)
-                    isFakeBoldText = true
+                    isFakeBoldText = text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold
                     style = Paint.Style.FILL
+                    typeface = selectedTypeface  // Apply selected font to final paint
                     // Match the alignment from measure paint
                     textAlign = textPaintForMeasure.textAlign
                 }
@@ -386,6 +392,8 @@ object MemeFileSaver {
                         textSize = textPaint.textSize
                         textAlign = textPaint.textAlign
                         style = Paint.Style.FILL
+                        typeface = selectedTypeface  // CRITICAL: Apply the SAME font as main text
+                        isFakeBoldText = text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold
                     }
                     
                     // Draw outline text multiple times with offset
