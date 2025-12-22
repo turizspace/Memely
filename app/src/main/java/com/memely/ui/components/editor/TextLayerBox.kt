@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -23,6 +24,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.memely.ui.viewmodels.MemeText
 import kotlin.math.roundToInt
+import androidx.compose.ui.text.style.TextAlign
+
 
 @Composable
 fun TextLayerBox(
@@ -79,21 +82,30 @@ fun TextLayerBox(
                 }
             }
     ) {
+        // Get alignment based on text align property
+        val contentAlignment = when (text.textAlign) {
+            TextAlign.Left, TextAlign.Start -> Alignment.CenterStart
+            TextAlign.Right, TextAlign.End -> Alignment.CenterEnd
+            TextAlign.Center -> Alignment.Center
+            else -> Alignment.CenterStart
+        }
+        
         if (text.selected) {
-            // Show outline while editing
-            if (text.outlineWidth > 0.dp) {
-                Box(
-                    modifier = Modifier
-                        .widthIn(max = text.maxWidth)
-                        .wrapContentSize()
-                ) {
-                    // Draw outline by rendering text multiple times with offsets
+            // Text field with actual border stroke
+            Box(
+                modifier = Modifier
+                    .widthIn(max = text.maxWidth)
+                    .wrapContentSize(),
+                contentAlignment = contentAlignment
+            ) {
+                // Outline layer - render text with outline color offset
+                if (text.outlineWidth > 0.dp) {
                     for (offsetX in -1..1) {
                         for (offsetY in -1..1) {
                             if (offsetX != 0 || offsetY != 0) {
                                 BasicTextField(
                                     value = textValue,
-                                    onValueChange = {}, // Read-only outline
+                                    onValueChange = {},
                                     textStyle = TextStyle(
                                         color = text.outlineColor,
                                         fontSize = text.fontSize,
@@ -114,30 +126,8 @@ fun TextLayerBox(
                             }
                         }
                     }
-                    // Main text field on top
-                    BasicTextField(
-                        value = textValue,
-                        onValueChange = {
-                            textValue = it
-                            onTextChange(it)
-                        },
-                        textStyle = TextStyle(
-                            color = text.color,
-                            fontSize = text.fontSize,
-                            fontFamily = text.fontFamily,
-                            fontWeight = text.fontWeight,
-                            fontStyle = text.fontStyle,
-                            textAlign = text.textAlign
-                        ),
-                        modifier = Modifier
-                            .widthIn(max = text.maxWidth)
-                            .wrapContentSize(),
-                        singleLine = false,
-                        maxLines = Int.MAX_VALUE,
-                        decorationBox = { inner -> inner() }
-                    )
                 }
-            } else {
+                // Main text field on top
                 BasicTextField(
                     value = textValue,
                     onValueChange = {
@@ -146,14 +136,14 @@ fun TextLayerBox(
                     },
                     textStyle = TextStyle(
                         color = text.color,
-                        fontSize = text.fontSize, // No scale multiplication - handled by graphicsLayer
+                        fontSize = text.fontSize,
                         fontFamily = text.fontFamily,
                         fontWeight = text.fontWeight,
                         fontStyle = text.fontStyle,
                         textAlign = text.textAlign
                     ),
                     modifier = Modifier
-                        .widthIn(max = text.maxWidth) // No scale multiplication
+                        .widthIn(max = text.maxWidth)
                         .wrapContentSize(),
                     singleLine = false,
                     maxLines = Int.MAX_VALUE,
@@ -161,14 +151,15 @@ fun TextLayerBox(
                 )
             }
         } else {
-            // Display text with optional outline by layering multiple text composables
-            if (text.outlineWidth > 0.dp) {
-                Box(
-                    modifier = Modifier
-                        .widthIn(max = text.maxWidth)
-                        .wrapContentSize()
-                ) {
-                    // Draw outline by rendering text multiple times with offsets
+            // Display text with actual border stroke
+            Box(
+                modifier = Modifier
+                    .widthIn(max = text.maxWidth)
+                    .wrapContentSize(),
+                contentAlignment = contentAlignment
+            ) {
+                // Outline layer - render text with outline color offset
+                if (text.outlineWidth > 0.dp) {
                     for (offsetX in -1..1) {
                         for (offsetY in -1..1) {
                             if (offsetX != 0 || offsetY != 0) {
@@ -183,29 +174,16 @@ fun TextLayerBox(
                                         textAlign = text.textAlign
                                     ),
                                     modifier = Modifier.offset(
-                                        x = offsetX.dp * (text.outlineWidth.value / 2),
-                                        y = offsetY.dp * (text.outlineWidth.value / 2)
+                                        x = (offsetX * text.outlineWidth.value / 2).dp,
+                                        y = (offsetY * text.outlineWidth.value / 2).dp
                                     ),
                                     maxLines = Int.MAX_VALUE
                                 )
                             }
                         }
                     }
-                    // Draw the main text on top
-                    Text(
-                        text = text.text,
-                        style = TextStyle(
-                            color = text.color,
-                            fontSize = text.fontSize,
-                            fontFamily = text.fontFamily,
-                            fontWeight = text.fontWeight,
-                            fontStyle = text.fontStyle,
-                            textAlign = text.textAlign
-                        ),
-                        maxLines = Int.MAX_VALUE
-                    )
                 }
-            } else {
+                // Main text on top
                 Text(
                     text = text.text,
                     style = TextStyle(
@@ -216,9 +194,6 @@ fun TextLayerBox(
                         fontStyle = text.fontStyle,
                         textAlign = text.textAlign
                     ),
-                    modifier = Modifier
-                        .widthIn(max = text.maxWidth)
-                        .wrapContentSize(),
                     maxLines = Int.MAX_VALUE
                 )
             }

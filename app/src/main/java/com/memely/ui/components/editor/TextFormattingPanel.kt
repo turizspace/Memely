@@ -1,8 +1,13 @@
 package com.memely.ui.components.editor
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -16,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.memely.ui.fonts.FontCatalog
 
 @Composable
 fun TextFormattingPanel(
@@ -32,6 +38,7 @@ fun TextFormattingPanel(
     modifier: Modifier = Modifier
 ) {
     var showFontMenu by remember { mutableStateOf(false) }
+    val currentFontOption = FontCatalog.getFontOptionByFamily(fontFamily)
     
     Column(
         modifier = modifier
@@ -40,7 +47,8 @@ fun TextFormattingPanel(
                 color = MaterialTheme.colors.surface,
                 shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
             )
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
@@ -66,7 +74,7 @@ fun TextFormattingPanel(
             )
         }
         
-        // Font Family Selector
+        // Font Family Selector with Preview
         Box {
             Button(
                 onClick = { showFontMenu = true },
@@ -77,46 +85,47 @@ fun TextFormattingPanel(
             ) {
                 Icon(Icons.Default.TextFields, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    when (fontFamily) {
-                        FontFamily.SansSerif -> "Sans Serif"
-                        FontFamily.Serif -> "Serif"
-                        FontFamily.Monospace -> "Monospace"
-                        FontFamily.Cursive -> "Cursive"
-                        else -> "Default"
-                    }
-                )
-                Spacer(Modifier.weight(1f))
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                    Text(
+                        currentFontOption.name,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        currentFontOption.category,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                    )
+                }
                 Icon(Icons.Default.ArrowDropDown, contentDescription = null)
             }
             
-            DropdownMenu(
-                expanded = showFontMenu,
-                onDismissRequest = { showFontMenu = false }
-            ) {
-                DropdownMenuItem(onClick = {
-                    onFontFamilyChange(FontFamily.SansSerif)
-                    showFontMenu = false
-                }) {
-                    Text("Sans Serif")
-                }
-                DropdownMenuItem(onClick = {
-                    onFontFamilyChange(FontFamily.Serif)
-                    showFontMenu = false
-                }) {
-                    Text("Serif")
-                }
-                DropdownMenuItem(onClick = {
-                    onFontFamilyChange(FontFamily.Monospace)
-                    showFontMenu = false
-                }) {
-                    Text("Monospace")
-                }
-                DropdownMenuItem(onClick = {
-                    onFontFamilyChange(FontFamily.Cursive)
-                    showFontMenu = false
-                }) {
-                    Text("Cursive")
+            // Dropdown menu with available fonts
+            if (showFontMenu) {
+                DropdownMenu(
+                    expanded = showFontMenu,
+                    onDismissRequest = { showFontMenu = false },
+                    modifier = Modifier.widthIn(min = 250.dp, max = 320.dp)
+                ) {
+                    // Display fonts section
+                    val displayFonts = FontCatalog.allFonts.filter { it.category == "Display" }
+                    displayFonts.forEach { fontOption ->
+                        DropdownMenuItem(
+                            onClick = {
+                                onFontFamilyChange(fontOption.fontFamily)
+                                showFontMenu = false
+                            }
+                        ) {
+                            Text(
+                                fontOption.name,
+                                fontFamily = fontOption.fontFamily,
+                                color = if (fontOption.fontFamily == fontFamily)
+                                    MaterialTheme.colors.primary
+                                else
+                                    MaterialTheme.colors.onSurface
+                            )
+                        }
+                    }
                 }
             }
         }
