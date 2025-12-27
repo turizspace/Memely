@@ -9,12 +9,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -35,13 +38,23 @@ fun ComposeNoteDialog(
     onPost: (caption: String) -> Unit
 ) {
     val context = LocalContext.current
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
     var caption by remember { mutableStateOf(initialCaption) }
     var hashtagHistory by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isCopied by remember { mutableStateOf(false) }
 
     // Initialize hashtag manager and load history
     LaunchedEffect(Unit) {
         HashtagHistoryManager.init(context)
         hashtagHistory = HashtagHistoryManager.getHashtagHistory()
+    }
+
+    // Reset copy indicator after 2 seconds
+    LaunchedEffect(isCopied) {
+        if (isCopied) {
+            kotlinx.coroutines.delay(2000)
+            isCopied = false
+        }
     }
 
     Dialog(onDismissRequest = { if (!isPosting) onDismiss() }) {
@@ -160,12 +173,43 @@ fun ComposeNoteDialog(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // URL display
-                    Text(
-                        text = imageUrl,
-                        style = MaterialTheme.typography.caption,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                    )
+                    // URL display with copy button
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = imageUrl,
+                            style = MaterialTheme.typography.caption,
+                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(imageUrl))
+                                isCopied = true
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.ContentCopy,
+                                contentDescription = "Copy to clipboard",
+                                tint = if (isCopied) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    if (isCopied) {
+                        Text(
+                            text = "✓ Copied to clipboard",
+                            style = MaterialTheme.typography.caption,
+                            color = MaterialTheme.colors.primary,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
