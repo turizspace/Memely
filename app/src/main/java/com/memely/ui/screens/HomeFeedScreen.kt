@@ -28,6 +28,7 @@ import com.memely.ui.tutorial.TutorialOverlay
 import com.memely.ui.tutorial.TutorialScreen
 import com.memely.ui.tutorial.TutorialManager
 import com.memely.ui.tutorial.tutorialTarget
+import com.memely.ui.viewmodels.TemplateGridScrollState
 
 @Composable
 fun HomeFeedScreen(
@@ -55,6 +56,11 @@ fun HomeFeedScreen(
         println("📡 HomeFeedScreen: Fetching meme templates...")
         FavoritesManager.initialize(context)  // Initialize favorites from storage
         TemplateRepository.fetchTemplates()
+    }
+    
+    // Reset scroll position when switching tabs
+    LaunchedEffect(selectedTab) {
+        TemplateGridScrollState.reset()
     }
     
     Box(modifier = Modifier.fillMaxSize()) {
