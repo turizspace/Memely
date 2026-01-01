@@ -11,6 +11,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +38,7 @@ fun TemplateCard(
     var isFavorite by remember { 
         mutableStateOf(FavoritesManager.isFavorite(context, template.url))
     }
+    var showPreview by remember { mutableStateOf(false) }
     
     Card(
         modifier = modifier
@@ -67,7 +69,7 @@ fun TemplateCard(
                 contentScale = ContentScale.Crop
             )
             
-            // Overlay with name and favorite button
+            // Overlay with name and action buttons
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -108,6 +110,21 @@ fun TemplateCard(
                     
                     Spacer(modifier = Modifier.width(8.dp))
                     
+                    // Preview button
+                    IconButton(
+                        onClick = { showPreview = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Visibility,
+                            contentDescription = "Preview template",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.width(4.dp))
+                    
                     // Favorite button
                     IconButton(
                         onClick = {
@@ -132,5 +149,17 @@ fun TemplateCard(
                 }
             }
         }
+    }
+    
+    // Show preview dialog if needed
+    if (showPreview) {
+        TemplatePreviewDialog(
+            template = template,
+            onDismiss = { showPreview = false },
+            onConfirm = { selectedTemplate ->
+                showPreview = false
+                onClick(selectedTemplate)
+            }
+        )
     }
 }
