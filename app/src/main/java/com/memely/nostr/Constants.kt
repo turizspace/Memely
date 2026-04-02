@@ -14,5 +14,5 @@ object Constants {
     const val KIND_RELAY_LIST = 10002
     
     // Meme Templates API
-    const val MEME_TEMPLATES_API = "https://turiz.space/memetemplates/index.php"
+    const val MEME_TEMPLATES_API = "https://proofofink.art/memetemplates/index.php"
 }
