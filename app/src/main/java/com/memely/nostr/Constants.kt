@@ -15,4 +15,14 @@ object Constants {
     
     // Meme Templates API
     const val MEME_TEMPLATES_API = "https://proofofink.art/memetemplates/index.php"
+    const val MEME_TEMPLATES_BASE_URL = "https://proofofink.art"
+    
+    /**
+     * Get full URL for a template image
+     * If URL is already absolute (starts with http), return as-is
+     * Otherwise, prepend the base URL
+     */
+    fun getTemplateImageUrl(templateUrl: String): String = 
+        if (templateUrl.startsWith("http")) templateUrl 
+        else "$MEME_TEMPLATES_BASE_URL$templateUrl"
 }

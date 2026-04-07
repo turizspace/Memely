@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.memely.data.MemeTemplate
 import com.memely.data.FavoritesManager
+import com.memely.nostr.Constants
 
 @Composable
 fun TemplateCard(
@@ -53,12 +54,8 @@ fun TemplateCard(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            // Template image - build full URL
-            val fullUrl = if (template.url.startsWith("http")) {
-                template.url
-            } else {
-                "https://turiz.space" + template.url
-            }
+            // Template image - use helper function to build full URL
+            val fullUrl = Constants.getTemplateImageUrl(template.url)
             
             AsyncImage(
                 model = fullUrl,

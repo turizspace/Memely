@@ -19,6 +19,7 @@ import com.memely.ui.components.SearchBar
 import com.memely.ui.components.TemplateGrid
 import com.memely.ui.components.TemplateTab
 import com.memely.ui.components.TemplateTabBar
+import com.memely.nostr.Constants
 
 @Composable
 fun TemplateSelectorDialog(
@@ -120,7 +121,7 @@ fun TemplateSelectorDialog(
                         println("🎨 TemplateSelectorDialog: Selected template - ${template.name}")
                         
                         // Convert template URL to Uri and pass to callback
-                        val templateUri = Uri.parse("https://turiz.space" + template.url)
+                        val templateUri = Uri.parse(Constants.getTemplateImageUrl(template.url))
                         onTemplateSelected(templateUri)
                     }
                 )

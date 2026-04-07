@@ -23,6 +23,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.memely.data.MemeTemplate
+import com.memely.nostr.Constants
 
 @Composable
 fun TemplatePreviewDialog(
@@ -69,12 +70,8 @@ fun TemplatePreviewDialog(
                     }
                 }
 
-                // Template image preview
-                val fullUrl = if (template.url.startsWith("http")) {
-                    template.url
-                } else {
-                    "https://turiz.space" + template.url
-                }
+                // Template image preview - use helper function to build full URL
+                val fullUrl = Constants.getTemplateImageUrl(template.url)
 
                 AsyncImage(
                     model = fullUrl,

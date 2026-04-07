@@ -29,6 +29,7 @@ import com.memely.ui.tutorial.TutorialScreen
 import com.memely.ui.tutorial.TutorialManager
 import com.memely.ui.tutorial.tutorialTarget
 import com.memely.ui.viewmodels.TemplateGridScrollState
+import com.memely.nostr.Constants
 
 @Composable
 fun HomeFeedScreen(
@@ -118,7 +119,7 @@ fun HomeFeedScreen(
                         }
                         
                         // Normal behavior: Convert template URL to Uri and pass to editor
-                        val templateUri = Uri.parse("https://turiz.space" + template.url)
+                        val templateUri = Uri.parse(Constants.getTemplateImageUrl(template.url))
                         onTemplateSelected(templateUri)
                     }
                 )
