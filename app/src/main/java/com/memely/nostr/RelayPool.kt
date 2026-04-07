@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
 
 class RelayPool(
     private var relays: List<String> = emptyList()
@@ -19,51 +20,68 @@ class RelayPool(
     private val _incomingMessagesFlow = MutableSharedFlow<String>(extraBufferCapacity = 100)
     val incomingMessagesFlow: SharedFlow<String> get() = _incomingMessagesFlow
     private val successful = AtomicInteger(0)
+    
+    // Use AtomicBoolean for thread-safe connection state tracking
+    private val isConnecting = AtomicBoolean(false)
 
     suspend fun connectAll() = withContext(connectionScope.coroutineContext) {
         if (relays.isEmpty()) {
             return@withContext
         }
         
-        
-        // Reset counters
-        successful.set(0)
-        _connectedRelaysFlow.value = 0
-        clients.clear()
-        
-        val connectionJobs = relays.map { url ->
-            connectionScope.launch {
-                try {
-                    val client = NostrClient(url)
-                    clients += client
-                    val ok = client.connect()
-                    if (ok) {
-                        val count = successful.incrementAndGet()
-                        _connectedRelaysFlow.value = count
-                        
-                        // Start listening for messages
-                        launch {
-                            try {
-                                for (msg in client.incoming) {
-                                    _incomingMessagesFlow.emit(msg)
-                                }
-                            } catch (e: Exception) {
-                            }
-                        }
-                    } else {
-                        clients.remove(client)
-                    }
-                } catch (e: Exception) {
-                }
-            }
+        // Atomic compare-and-set: Only proceed if we can transition from false -> true
+        if (!isConnecting.compareAndSet(false, true)) {
+            println("🔗 RelayPool: Connection already in progress, skipping duplicate attempt")
+            return@withContext
         }
         
-        // Wait for all connection attempts with timeout
         try {
-            withTimeout(15000) {
-                connectionJobs.forEach { it.join() }
+            // Reset counters for fresh connection attempt
+            successful.set(0)
+            clients.clear()
+            
+            val connectionJobs = relays.map { url ->
+                connectionScope.launch {
+                    try {
+                        val client = NostrClient(url)
+                        clients += client
+                        val ok = client.connect()
+                        if (ok) {
+                            successful.incrementAndGet()
+                            // Do NOT update flow during cascade - only at the end
+                            
+                            // Start listening for messages
+                            launch {
+                                try {
+                                    for (msg in client.incoming) {
+                                        _incomingMessagesFlow.emit(msg)
+                                    }
+                                } catch (e: Exception) {
+                                }
+                            }
+                        } else {
+                            clients.remove(client)
+                        }
+                    } catch (e: Exception) {
+                    }
+                }
             }
-        } catch (e: TimeoutCancellationException) {
+            
+            // Wait for all connection attempts with timeout
+            try {
+                withTimeout(15000) {
+                    connectionJobs.forEach { it.join() }
+                }
+            } catch (e: TimeoutCancellationException) {
+            }
+            
+            // UPDATE ONCE after all connections complete - single atomic state update
+            val finalCount = successful.get()
+            _connectedRelaysFlow.value = finalCount
+            println("🔗 RelayPool: Connected to $finalCount/${relays.size} relays")
+        } finally {
+            // Always release the connection lock
+            isConnecting.set(false)
         }
     }
 
@@ -74,14 +92,14 @@ class RelayPool(
         }
         
         // Close current connections
-        val previousCount = clients.size
         clients.forEach { it.close() }
         clients.clear()
-        successful.set(0)
-        _connectedRelaysFlow.value = 0
         
         // Update relay list
         relays = newRelays
+        
+        // Reset counter but DON'T update flow yet - only update after new connections establish
+        successful.set(0)
         
         // Reconnect with new relays using the persistent scope
         connectAll()
