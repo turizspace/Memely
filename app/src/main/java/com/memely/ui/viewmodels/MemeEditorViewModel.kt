@@ -1,5 +1,7 @@
 package com.memely.ui.viewmodels
 
+import android.net.Uri
+import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -9,7 +11,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import android.net.Uri
+import com.memely.util.SecureLog
+import java.io.File
 
 // Data classes for editor layers
 data class MemeText(
@@ -45,12 +48,14 @@ data class MemeOverlayImage(
 )
 
 // ViewModel for managing meme editor state
-class MemeEditorViewModel {
+class MemeEditorViewModel : ViewModel() {
+    private val temporaryCacheFiles = linkedSetOf<String>()
+    private var sourceImageUri by mutableStateOf<Uri?>(null)
+
     var texts by mutableStateOf(listOf<MemeText>())
     var overlays by mutableStateOf(listOf<MemeOverlayImage>())
     var selectedLayerIndex by mutableStateOf<Int?>(null)
     var selectedIsText by mutableStateOf(true)
-    var showColorPicker by mutableStateOf(false)
     var isSaving by mutableStateOf(false)
     var baseImageSize by mutableStateOf(IntSize.Zero) // Displayed size on screen
     var originalImageWidth by mutableStateOf(0) // Original image width
@@ -59,12 +64,29 @@ class MemeEditorViewModel {
     var imageOffsetY by mutableStateOf(0f) // Offset from top edge when centered
     var localImageUri by mutableStateOf<Uri?>(null) // Cached local URI for remote images
 
+    fun syncBaseImageUri(uri: Uri) {
+        if (sourceImageUri == uri) {
+            return
+        }
+
+        sourceImageUri = uri
+        if (!uri.isRemote()) {
+            localImageUri = uri
+        } else {
+            localImageUri = null
+        }
+    }
+
     fun updateBaseImageSize(size: IntSize) {
         baseImageSize = size
     }
     
-    fun updateLocalImageUri(uri: Uri) {
+    fun updateLocalImageUri(uri: Uri?) {
         localImageUri = uri
+    }
+
+    fun registerTemporaryCacheFile(file: File) {
+        temporaryCacheFiles += file.absolutePath
     }
 
     fun updateOriginalImageSize(width: Int, height: Int) {
@@ -77,12 +99,16 @@ class MemeEditorViewModel {
         imageOffsetY = offsetY
     }
 
+    fun updateSavingState(saving: Boolean) {
+        isSaving = saving
+    }
+
     fun addText(position: Offset) {
         // Deselect all existing
         texts = texts.map { it.copy(selected = false) }
         overlays = overlays.map { it.copy(selected = false) }
         
-        println("➕ Adding text at position: $position, baseImageSize: $baseImageSize, offset: ($imageOffsetX, $imageOffsetY)")
+        SecureLog.d("MemeEditorViewModel: Adding text at position=$position")
         
         val newText = MemeText(
             text = "New Text",
@@ -102,7 +128,7 @@ class MemeEditorViewModel {
         val centerX = initialPosition?.x ?: (imageOffsetX + (baseImageSize.width / 2f))
         val centerY = initialPosition?.y ?: (imageOffsetY + (baseImageSize.height / 2f))
 
-        println("➕ Adding overlay at position: ($centerX, $centerY)")
+        SecureLog.d("MemeEditorViewModel: Adding overlay at position=($centerX, $centerY)")
 
         val overlayImage = MemeOverlayImage(
             uri = uri,
@@ -308,4 +334,23 @@ class MemeEditorViewModel {
             if (!selectedIsText && idx < overlays.size) overlays[idx] else null
         }
     }
+
+    override fun onCleared() {
+        temporaryCacheFiles.forEach { path ->
+            runCatching {
+                val file = File(path)
+                if (file.exists() && !file.delete()) {
+                    SecureLog.w("MemeEditorViewModel: Failed to delete cached file ${file.name}")
+                }
+            }.onFailure { throwable ->
+                SecureLog.e("MemeEditorViewModel: Error deleting cached image", throwable)
+            }
+        }
+        temporaryCacheFiles.clear()
+    }
+}
+
+private fun Uri.isRemote(): Boolean {
+    val scheme = scheme?.lowercase()
+    return scheme == "http" || scheme == "https"
 }

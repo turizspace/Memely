@@ -1,7 +1,6 @@
 package com.memely.ui.screens
 
 import android.content.Intent
-import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
@@ -13,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import com.memely.R
 import com.memely.nostr.AmberSignerManager
 import com.memely.nostr.KeyStoreManager
+import com.memely.util.SecureLog
 import kotlinx.coroutines.launch
 
 @Composable
@@ -63,7 +63,7 @@ fun LoginScreen(
                                 AmberSignerManager.configure(result.result, packageName)
                                 KeyStoreManager.saveExternalPubkey(result.result)
                                 KeyStoreManager.saveAmberPackageName(packageName)
-                                android.util.Log.d("MemelyLogin", "✅ Amber login successful. Pubkey: ${result.result}, Package: $packageName")
+                                SecureLog.i("LoginScreen: Amber login succeeded for ${SecureLog.truncateHex(result.result)}")
                                 status = "✅ Amber login successful\nPubkey: ${result.result.take(12)}…"
                                 onLoggedIn()
                             } else {
@@ -130,7 +130,9 @@ fun LoginScreen(
 
                             KeyStoreManager.importNsec(nsecInput)
                             val pubHex = KeyStoreManager.getPubkeyHex()
-                            Log.d("MemelyLogin", "✅ Logged in with NSEC. Pubkey: $pubHex")
+                            pubHex?.let {
+                                SecureLog.i("LoginScreen: Local key login succeeded for ${SecureLog.truncateHex(it)}")
+                            }
                             status = "✅ Logged in with NSEC\nPubkey: ${pubHex?.take(12)}…"
                             
                             onLoggedIn()

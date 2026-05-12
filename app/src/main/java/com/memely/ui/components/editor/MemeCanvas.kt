@@ -17,11 +17,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import coil.compose.AsyncImage
 import android.net.Uri
+import com.memely.util.SecureLog
 import com.memely.ui.viewmodels.MemeEditorViewModel
-import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 
@@ -37,14 +36,17 @@ fun MemeCanvas(
     var originalImageWidth by remember { mutableStateOf(0) }
     var originalImageHeight by remember { mutableStateOf(0) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
-    var localImageUri by remember { mutableStateOf(baseImageUri) }
+    val displayImageUri = viewModel.localImageUri ?: baseImageUri
+    val dimensionImageUri = viewModel.localImageUri ?: baseImageUri.takeUnless { it.isRemote() }
     
     // Download remote image if needed
     LaunchedEffect(baseImageUri) {
+        viewModel.syncBaseImageUri(baseImageUri)
+
         val uriString = baseImageUri.toString()
-        if (uriString.startsWith("http")) {
+        if (uriString.startsWith("http") && viewModel.localImageUri == null) {
             // Download from remote URL and save to cache
-            withContext(Dispatchers.IO) {
+            val tempFile = withContext(Dispatchers.IO) {
                 try {
                     val httpClient = com.memely.network.SecureHttpClient.createDownloadClient()
                     val request = Request.Builder().url(uriString).build()
@@ -56,27 +58,31 @@ fun MemeCanvas(
                             tempFile.outputStream().use { output ->
                                 response.body?.bytes()?.let { output.write(it) }
                             }
-                            localImageUri = Uri.fromFile(tempFile)
-                            viewModel.updateLocalImageUri(localImageUri) // Store in ViewModel
-                            println("✅ MemeCanvas: Downloaded template to ${tempFile.absolutePath}")
+                            tempFile
                         } else {
-                            println("❌ MemeCanvas: Failed to download template: ${response.code}")
+                            SecureLog.w("MemeCanvas: Failed to download template code=${response.code}")
+                            null
                         }
                     }
                 } catch (e: Exception) {
-                    println("❌ MemeCanvas: Error downloading template: ${e.message}")
+                    SecureLog.e("MemeCanvas: Error downloading template", e)
+                    null
                 }
             }
-        } else {
-            // Already local, just store it
-            viewModel.updateLocalImageUri(baseImageUri)
+
+            if (tempFile != null) {
+                viewModel.registerTemporaryCacheFile(tempFile)
+                viewModel.updateLocalImageUri(Uri.fromFile(tempFile))
+                SecureLog.d("MemeCanvas: Downloaded template to ${tempFile.name}")
+            }
         }
     }
     
     // Get original image dimensions
-    LaunchedEffect(localImageUri) {
+    LaunchedEffect(dimensionImageUri) {
+        val resolvedImageUri = dimensionImageUri ?: return@LaunchedEffect
         try {
-            val inputStream = context.contentResolver.openInputStream(localImageUri)
+            val inputStream = context.contentResolver.openInputStream(resolvedImageUri)
             val options = android.graphics.BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
             }
@@ -85,9 +91,9 @@ fun MemeCanvas(
             originalImageHeight = options.outHeight
             inputStream?.close()
             viewModel.updateOriginalImageSize(originalImageWidth, originalImageHeight)
-            println("✅ MemeCanvas: Image dimensions - ${originalImageWidth}x${originalImageHeight}")
+            SecureLog.d("MemeCanvas: Image dimensions ${originalImageWidth}x${originalImageHeight}")
         } catch (e: Exception) {
-            println("❌ MemeCanvas: Error reading image dimensions: ${e.message}")
+            SecureLog.e("MemeCanvas: Error reading image dimensions", e)
         }
     }
     
@@ -115,7 +121,10 @@ fun MemeCanvas(
             val offsetX = (containerSize.width - displayedSize.width) / 2f
             val offsetY = (containerSize.height - displayedSize.height) / 2f
             
-            println("📐 MemeCanvas: Container=${containerSize}, Original=${originalImageWidth}x${originalImageHeight}, Displayed=${displayedSize}, Offset=(${offsetX},${offsetY}), ImageRange=[${offsetX},${offsetX + displayedSize.width}]x[${offsetY},${offsetY + displayedSize.height}]")
+            SecureLog.d(
+                "MemeCanvas: displayed=$displayedSize container=$containerSize " +
+                    "offset=($offsetX,$offsetY)"
+            )
             
             viewModel.updateBaseImageSize(displayedSize)
             viewModel.updateImageOffset(offsetX, offsetY)
@@ -136,7 +145,7 @@ fun MemeCanvas(
     ) {
         // Base image - fill available space and fit inside
         AsyncImage(
-            model = localImageUri,
+            model = displayImageUri,
             contentDescription = "Base Image",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit
@@ -176,4 +185,9 @@ fun MemeCanvas(
             )
         }
     }
+}
+
+private fun Uri.isRemote(): Boolean {
+    val scheme = scheme?.lowercase()
+    return scheme == "http" || scheme == "https"
 }

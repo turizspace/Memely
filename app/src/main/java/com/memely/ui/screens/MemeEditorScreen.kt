@@ -23,6 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.memely.di.appContainer
+import com.memely.di.viewModelFactory
 import com.memely.ui.viewmodels.MemeOverlayImage
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +53,7 @@ import com.memely.nostr.NostrRepository
 import com.memely.nostr.RelayEventTracker
 import com.memely.nostr.RelayConnectionManager
 import com.memely.nostr.PublishResult
+import com.memely.util.SecureLog
 import kotlinx.coroutines.delay
 import java.io.File
 import com.memely.ui.tutorial.TutorialOverlay
@@ -65,10 +69,19 @@ fun MemeEditorScreen(
     onNavigateToHomeFeed: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val appContainer = remember(context) { context.appContainer }
     val coroutineScope = rememberCoroutineScope()
-    val viewModel = remember { MemeEditorViewModel() }
-    val blossomViewModel = remember { BlossomUploadViewModel() }
-    val nostrPostViewModel = remember { NostrPostViewModel() }
+    val blossomViewModel: BlossomUploadViewModel = viewModel(
+        factory = remember(appContainer) {
+            viewModelFactory { BlossomUploadViewModel(appContainer.blossomClient) }
+        }
+    )
+    val nostrPostViewModel: NostrPostViewModel = viewModel(
+        factory = remember(appContainer) {
+            viewModelFactory { NostrPostViewModel(appContainer.nostrNotePublisher) }
+        }
+    )
+    val editorViewModel: MemeEditorViewModel = viewModel()
 
     // Manage persistent relay connections during meme editing
     var showRelayStatus by remember { mutableStateOf(false) }
@@ -132,7 +145,7 @@ fun MemeEditorScreen(
     }
 
     // Track Blossom upload state separately
-    val blossomUploadState = blossomViewModel.uploadState
+    val blossomUploadState by blossomViewModel.uploadState.collectAsState()
     val isUploadingToBlossom = blossomUploadState is BlossomUploadViewModel.UploadState.Uploading
     
     // Handle Blossom upload errors
@@ -168,15 +181,15 @@ fun MemeEditorScreen(
             val displayWidthPx = defaultDisplayDpValue * screenDensity
 
             // Compute center of displayed image in container coordinates
-            val centerX = viewModel.imageOffsetX + (viewModel.baseImageSize.width / 2f)
-            val centerY = viewModel.imageOffsetY + (viewModel.baseImageSize.height / 2f)
+            val centerX = editorViewModel.imageOffsetX + (editorViewModel.baseImageSize.width / 2f)
+            val centerY = editorViewModel.imageOffsetY + (editorViewModel.baseImageSize.height / 2f)
 
             // Convert center to top-left by subtracting half of display size (so overlay center aligns)
             val initialX = centerX - (displayWidthPx / 2f)
             val displayHeightPx = displayWidthPx * (options.outHeight.toFloat() / options.outWidth.toFloat())
             val initialY = centerY - (displayHeightPx / 2f)
 
-            viewModel.addOverlay(
+            editorViewModel.addOverlay(
                 uri,
                 options.outWidth,
                 options.outHeight,
@@ -209,12 +222,12 @@ fun MemeEditorScreen(
                     canAddText = true,
                     onAddText = {
                         // Add text at center of the displayed image (accounting for offset)
-                        val centerX = viewModel.imageOffsetX + (viewModel.baseImageSize.width / 2f)
-                        val centerY = viewModel.imageOffsetY + (viewModel.baseImageSize.height / 2f)
+                        val centerX = editorViewModel.imageOffsetX + (editorViewModel.baseImageSize.width / 2f)
+                        val centerY = editorViewModel.imageOffsetY + (editorViewModel.baseImageSize.height / 2f)
 
                         // Account for the 8.dp padding used inside TextLayerBox so stored top-left
                         // results in the visible text content appearing at the center.
-                        viewModel.addText(
+                        editorViewModel.addText(
                             androidx.compose.ui.geometry.Offset(
                                 centerX - textPaddingPx,
                                 centerY - textPaddingPx
@@ -228,37 +241,37 @@ fun MemeEditorScreen(
                         // Show template selector dialog to add template as layer
                         showTemplateSelector = true
                     },
-                    canChangeColor = viewModel.selectedIsText && viewModel.selectedLayerIndex != null,
+                    canChangeColor = editorViewModel.selectedIsText && editorViewModel.selectedLayerIndex != null,
                     onChangeColor = {
                         showColorPicker = true
                     },
-                    canDelete = viewModel.selectedLayerIndex != null,
+                    canDelete = editorViewModel.selectedLayerIndex != null,
                     onDelete = {
-                        viewModel.deleteSelected()
+                        editorViewModel.deleteSelected()
                     },
-                    isSaving = viewModel.isSaving,
+                    isSaving = editorViewModel.isSaving,
                     onSave = {
-                        viewModel.isSaving = true
+                        editorViewModel.updateSavingState(true)
                         coroutineScope.launch(Dispatchers.IO) {
                             MemeFileSaver.saveMeme(
                                 context = context,
-                                imageUri = viewModel.localImageUri ?: imageUri, // Use cached local URI if available
-                                texts = viewModel.texts,
-                                overlays = viewModel.overlays,
-                                baseImageSize = viewModel.baseImageSize,
-                                originalImageWidth = viewModel.originalImageWidth,
-                                originalImageHeight = viewModel.originalImageHeight,
-                                imageOffsetX = viewModel.imageOffsetX,
-                                imageOffsetY = viewModel.imageOffsetY,
+                                imageUri = editorViewModel.localImageUri ?: imageUri, // Use cached local URI if available
+                                texts = editorViewModel.texts,
+                                overlays = editorViewModel.overlays,
+                                baseImageSize = editorViewModel.baseImageSize,
+                                originalImageWidth = editorViewModel.originalImageWidth,
+                                originalImageHeight = editorViewModel.originalImageHeight,
+                                imageOffsetX = editorViewModel.imageOffsetX,
+                                imageOffsetY = editorViewModel.imageOffsetY,
                                 onSuccess = { path ->
                                     coroutineScope.launch(Dispatchers.Main) {
-                                        viewModel.isSaving = false
+                                        editorViewModel.updateSavingState(false)
                                         onDone(path)
                                     }
                                 },
                                 onError = {
                                     coroutineScope.launch(Dispatchers.Main) {
-                                        viewModel.isSaving = false
+                                        editorViewModel.updateSavingState(false)
                                         onDone("")
                                     }
                                 }
@@ -267,7 +280,7 @@ fun MemeEditorScreen(
                     },
                     onPostToNostr = {
                         // Start the Post to Nostr workflow with relay connection management
-                        viewModel.isSaving = true
+                        editorViewModel.updateSavingState(true)
                         
                         coroutineScope.launch(Dispatchers.IO) {
                             // Verify connection health before starting
@@ -281,17 +294,17 @@ fun MemeEditorScreen(
                             // Step 1: Save the meme
                             MemeFileSaver.saveMeme(
                                 context = context,
-                                imageUri = viewModel.localImageUri ?: imageUri, // Use cached local URI if available
-                                texts = viewModel.texts,
-                                overlays = viewModel.overlays,
-                                baseImageSize = viewModel.baseImageSize,
-                                originalImageWidth = viewModel.originalImageWidth,
-                                originalImageHeight = viewModel.originalImageHeight,
-                                imageOffsetX = viewModel.imageOffsetX,
-                                imageOffsetY = viewModel.imageOffsetY,
+                                imageUri = editorViewModel.localImageUri ?: imageUri, // Use cached local URI if available
+                                texts = editorViewModel.texts,
+                                overlays = editorViewModel.overlays,
+                                baseImageSize = editorViewModel.baseImageSize,
+                                originalImageWidth = editorViewModel.originalImageWidth,
+                                originalImageHeight = editorViewModel.originalImageHeight,
+                                imageOffsetX = editorViewModel.imageOffsetX,
+                                imageOffsetY = editorViewModel.imageOffsetY,
                                 onSuccess = { path ->
-                                    coroutineScope.launch(Dispatchers.Main) {
-                                        viewModel.isSaving = false
+                                    coroutineScope.launch(Dispatchers.Main) uploadWorkflow@{
+                                        editorViewModel.updateSavingState(false)
                                         val savedUri = android.net.Uri.parse(path)
                                         savedMemeFile = null // Clear file reference since we're using URI
                                         
@@ -302,12 +315,12 @@ fun MemeEditorScreen(
                                         
                                         if (pubkeyHex.isNullOrBlank()) {
                                             // TODO: Show error to user
-                                            return@launch
+                                            return@uploadWorkflow
                                         }
                                         
                                         if (!isUsingAmber && privKeyHex.isNullOrBlank()) {
                                             // TODO: Show error to user
-                                            return@launch
+                                            return@uploadWorkflow
                                         }
                                         
                                         // Configure Amber if using external signer
@@ -316,7 +329,7 @@ fun MemeEditorScreen(
                                             if (packageName != null) {
                                                 AmberSignerManager.configure(pubkeyHex, packageName)
                                             } else {
-                                                return@launch
+                                                return@uploadWorkflow
                                             }
                                         }
                                         
@@ -367,7 +380,6 @@ fun MemeEditorScreen(
                                                     )
                                                 }
                                             },
-                                            coroutineScope = coroutineScope,
                                             onSuccess = { url ->
                                                 // Step 3: Show compose dialog
                                                 uploadedImageUrl = url
@@ -378,27 +390,27 @@ fun MemeEditorScreen(
                                 },
                                 onError = {
                                     coroutineScope.launch(Dispatchers.Main) {
-                                        viewModel.isSaving = false
+                                        editorViewModel.updateSavingState(false)
                                     }
                                 }
                             )
                         }
                     },
-                    isPostingToNostr = viewModel.isSaving || isUploadingToBlossom,
+                    isPostingToNostr = editorViewModel.isSaving || isUploadingToBlossom,
                     onSaveToDevice = {
                         isSavingToDevice = true
                         coroutineScope.launch(Dispatchers.IO) {
                             MemeFileSaver.saveMeme(
                                 context = context,
-                                imageUri = viewModel.localImageUri ?: imageUri, // Use cached local URI if available
-                                texts = viewModel.texts,
-                                overlays = viewModel.overlays,
-                                baseImageSize = viewModel.baseImageSize,
-                                originalImageWidth = viewModel.originalImageWidth,
-                                originalImageHeight = viewModel.originalImageHeight,
-                                imageOffsetX = viewModel.imageOffsetX,
-                                imageOffsetY = viewModel.imageOffsetY,
-                                onSuccess = { path ->
+                                imageUri = editorViewModel.localImageUri ?: imageUri, // Use cached local URI if available
+                                texts = editorViewModel.texts,
+                                overlays = editorViewModel.overlays,
+                                baseImageSize = editorViewModel.baseImageSize,
+                                originalImageWidth = editorViewModel.originalImageWidth,
+                                originalImageHeight = editorViewModel.originalImageHeight,
+                                imageOffsetX = editorViewModel.imageOffsetX,
+                                imageOffsetY = editorViewModel.imageOffsetY,
+                                onSuccess = { _ ->
                                     coroutineScope.launch(Dispatchers.Main) {
                                         isSavingToDevice = false
                                     }
@@ -414,15 +426,15 @@ fun MemeEditorScreen(
                     isSavingToDevice = isSavingToDevice,
                     onShowTextFormatting = { showTextFormattingPanel = true },
                     onShowImageEditing = { showImageEditingPanel = true },
-                    selectedIsText = viewModel.selectedIsText && viewModel.selectedLayerIndex != null,
-                    selectedIsImage = !viewModel.selectedIsText && viewModel.selectedLayerIndex != null,
+                    selectedIsText = editorViewModel.selectedIsText && editorViewModel.selectedLayerIndex != null,
+                    selectedIsImage = !editorViewModel.selectedIsText && editorViewModel.selectedLayerIndex != null,
                     onGloballyPositioned = {
                         // When the controls are laid out, re-register all tutorial targets
                         // to ensure their positions are correctly captured.
                         TutorialTargetRegistry.repositionAllTargets()
                     },
-                    outlineWidth = viewModel.getSelectedText()?.outlineWidth ?: 0.dp,
-                    onOutlineWidthChange = { viewModel.updateSelectedTextOutlineWidth(it) }
+                    outlineWidth = editorViewModel.getSelectedText()?.outlineWidth ?: 0.dp,
+                    onOutlineWidthChange = { editorViewModel.updateSelectedTextOutlineWidth(it) }
                 )
             }
         ) { paddingValues ->
@@ -433,7 +445,7 @@ fun MemeEditorScreen(
             ) {
                 MemeCanvas(
                     baseImageUri = imageUri,
-                    viewModel = viewModel,
+                    viewModel = editorViewModel,
                     modifier = Modifier
                         .fillMaxSize()
                         .tutorialTarget("meme_canvas")
@@ -446,11 +458,11 @@ fun MemeEditorScreen(
     }
 
     // Color picker dialog
-    if (showColorPicker && viewModel.selectedIsText && viewModel.selectedLayerIndex != null) {
+    if (showColorPicker && editorViewModel.selectedIsText && editorViewModel.selectedLayerIndex != null) {
         ColorPickerDialog(
             onDismiss = { showColorPicker = false },
             onColorSelected = { color ->
-                viewModel.updateSelectedTextColor(color)
+                editorViewModel.updateSelectedTextColor(color)
                 showColorPicker = false
             }
         )
@@ -458,7 +470,7 @@ fun MemeEditorScreen(
 
     // Text Formatting Panel
     if (showTextFormattingPanel) {
-        val selectedText = viewModel.getSelectedText()
+        val selectedText = editorViewModel.getSelectedText()
         if (selectedText != null) {
             val textFormattingSheetState = rememberModalBottomSheetState(
                 initialValue = ModalBottomSheetValue.Expanded
@@ -479,11 +491,11 @@ fun MemeEditorScreen(
                         fontWeight = selectedText.fontWeight,
                         fontStyle = selectedText.fontStyle,
                         textAlign = selectedText.textAlign,
-                        onFontSizeChange = { viewModel.updateSelectedTextFontSize(it.sp) },
-                        onFontFamilyChange = { viewModel.updateSelectedTextFontFamily(it) },
-                        onFontWeightChange = { viewModel.updateSelectedTextFontWeight(it) },
-                        onFontStyleChange = { viewModel.updateSelectedTextFontStyle(it) },
-                        onTextAlignChange = { viewModel.updateSelectedTextAlign(it) }
+                        onFontSizeChange = { editorViewModel.updateSelectedTextFontSize(it.sp) },
+                        onFontFamilyChange = { editorViewModel.updateSelectedTextFontFamily(it) },
+                        onFontWeightChange = { editorViewModel.updateSelectedTextFontWeight(it) },
+                        onFontStyleChange = { editorViewModel.updateSelectedTextFontStyle(it) },
+                        onTextAlignChange = { editorViewModel.updateSelectedTextAlign(it) }
                     )
                 },
                 sheetState = textFormattingSheetState,
@@ -494,7 +506,7 @@ fun MemeEditorScreen(
 
     // Image Editing Panel
     if (showImageEditingPanel) {
-        val selectedImage = viewModel.getSelectedImage()
+        val selectedImage = editorViewModel.getSelectedImage()
         if (selectedImage != null) {
             val imageEditingSheetState = rememberModalBottomSheetState(
                 initialValue = ModalBottomSheetValue.Expanded
@@ -514,10 +526,10 @@ fun MemeEditorScreen(
                         alpha = selectedImage.alpha,
                         rotation = selectedImage.rotation,
                         scale = selectedImage.scale,
-                        onCornerRadiusChange = { viewModel.updateSelectedImageCornerRadius(it.dp) },
-                        onAlphaChange = { viewModel.updateSelectedImageAlpha(it) },
-                        onRotationChange = { viewModel.updateSelectedImageRotation(it) },
-                        onScaleChange = { viewModel.updateSelectedImageScale(it) }
+                        onCornerRadiusChange = { editorViewModel.updateSelectedImageCornerRadius(it.dp) },
+                        onAlphaChange = { editorViewModel.updateSelectedImageAlpha(it) },
+                        onRotationChange = { editorViewModel.updateSelectedImageRotation(it) },
+                        onScaleChange = { editorViewModel.updateSelectedImageScale(it) }
                     )
                 },
                 sheetState = imageEditingSheetState,
@@ -528,7 +540,8 @@ fun MemeEditorScreen(
 
     // Compose note dialog for posting to Nostr
     if (showComposeDialog && uploadedImageUrl != null) {
-        val isPosting = nostrPostViewModel.postState is NostrPostViewModel.PostState.Posting
+        val postState by nostrPostViewModel.postState.collectAsState()
+        val isPosting = postState is NostrPostViewModel.PostState.Posting
         
         ComposeNoteDialog(
             imageUrl = uploadedImageUrl!!,
@@ -595,11 +608,8 @@ fun MemeEditorScreen(
                             
                             // Calculate event ID before sending to Amber
                             val eventId = NostrEventSigner.calculateEventId(unsignedEvent.toString())
-                            unsignedEvent.put("id", eventId)
                             
-                            
-                            
-                            // Sign with Amber
+                            // Sign with Amber (send without id, let Amber calculate it)
                             val result = AmberSignerManager.signEvent(
                                 unsignedEvent.toString(),
                                 eventId
@@ -626,14 +636,17 @@ fun MemeEditorScreen(
                             // Wait for relay responses (timeout after 5 seconds)
                             delay(5000)
                             
+                            // Mark any remaining pending relays as timed out
+                            RelayEventTracker.getPendingRelays(actualEventId).forEach { relay ->
+                                RelayEventTracker.recordTimeout(actualEventId, relay)
+                            }
+                            
                             // Get the publish result using the ACTUAL event ID
                             val result_final = RelayEventTracker.getPublishResult(actualEventId)
                             RelayEventTracker.completePublish(actualEventId)
                             
                             coroutineScope.launch(Dispatchers.Main) {
                                 nostrPostViewModel.setSuccessState(actualEventId)
-                                
-                                // Show relay status
                                 publishResult = result_final
                                 showRelayStatus = true
                                 showComposeDialog = false
@@ -655,20 +668,19 @@ fun MemeEditorScreen(
                         imageUrl = uploadedImageUrl!!,
                         pubkeyHex = pubkeyHex,
                         privKeyBytes = privKeyBytes,
-                        coroutineScope = coroutineScope,
                         onSuccess = { actualEventId ->
-                            
-                            
-                            // Wait for relay responses (timeout after 5 seconds)
                             coroutineScope.launch(Dispatchers.IO) {
                                 delay(5000)
                                 
-                                // Get the publish result
+                                // Mark any remaining pending relays as timed out
+                                RelayEventTracker.getPendingRelays(actualEventId).forEach { relay ->
+                                    RelayEventTracker.recordTimeout(actualEventId, relay)
+                                }
+                                
                                 val result_final = RelayEventTracker.getPublishResult(actualEventId)
                                 RelayEventTracker.completePublish(actualEventId)
-                                
+
                                 coroutineScope.launch(Dispatchers.Main) {
-                                    // Show relay status
                                     publishResult = result_final
                                     showRelayStatus = true
                                     showComposeDialog = false
@@ -733,15 +745,15 @@ fun MemeEditorScreen(
 
                             val displayWidthPx = defaultDisplayDpValue * screenDensity
 
-                            val centerX = viewModel.imageOffsetX + (viewModel.baseImageSize.width / 2f)
-                            val centerY = viewModel.imageOffsetY + (viewModel.baseImageSize.height / 2f)
+                            val centerX = editorViewModel.imageOffsetX + (editorViewModel.baseImageSize.width / 2f)
+                            val centerY = editorViewModel.imageOffsetY + (editorViewModel.baseImageSize.height / 2f)
 
                             val initialX = centerX - (displayWidthPx / 2f)
                             val displayHeightPx = displayWidthPx * (dimensions.second.toFloat() / dimensions.first.toFloat())
                             val initialY = centerY - (displayHeightPx / 2f)
 
                             // Add template as overlay layer
-                            viewModel.addOverlay(
+                            editorViewModel.addOverlay(
                                 templateUri,
                                 dimensions.first,
                                 dimensions.second,
@@ -751,7 +763,7 @@ fun MemeEditorScreen(
                             showTemplateSelector = false
                         }
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        SecureLog.e("MemeEditorScreen: Failed to add template overlay", e)
                         coroutineScope.launch(Dispatchers.Main) {
                             showTemplateSelector = false
                         }

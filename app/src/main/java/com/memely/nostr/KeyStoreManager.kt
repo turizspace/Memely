@@ -1,6 +1,7 @@
 package com.memely.nostr
 
 import android.content.Context
+import com.memely.util.SecureLog
 import com.memely.util.SecureStorage
 import java.util.Locale
 
@@ -10,6 +11,16 @@ import java.util.Locale
  */
 object KeyStoreManager {
     private lateinit var secureStorage: SecureStorage
+
+    private fun storageOrNull(): SecureStorage? {
+        if (::secureStorage.isInitialized) {
+            return secureStorage
+        }
+
+        return runCatching { SecureStorage.getInstance() }
+            .onSuccess { secureStorage = it }
+            .getOrNull()
+    }
 
     fun init(context: Context) {
         SecureStorage.init(context)
@@ -37,15 +48,21 @@ object KeyStoreManager {
     }
 
     private fun saveKeysToSecureStorage(privHex: String?, pubHex: String?) {
+        val storage = requireNotNull(storageOrNull()) {
+            "KeyStoreManager is not initialized"
+        }
         if (privHex != null) {
-            secureStorage.putString("priv_hex", privHex)
+            storage.putString("priv_hex", privHex)
         }
         if (pubHex != null) {
-            secureStorage.putString("pub_hex", pubHex)
+            storage.putString("pub_hex", pubHex)
         }
     }
 
     fun saveExternalPubkey(pubkeyInput: String) {
+        val storage = requireNotNull(storageOrNull()) {
+            "KeyStoreManager is not initialized"
+        }
         val pubHex = if (pubkeyInput.lowercase(Locale.ROOT).startsWith("npub")) {
             // It's a bech32 npub, decode it
             Nip19.decodeToHex(pubkeyInput)
@@ -53,22 +70,23 @@ object KeyStoreManager {
             // It's already hex, use it directly
             pubkeyInput
         }
-        secureStorage.putString("external_pubkey", pubHex)
-        println("🔐 KeyStore: Saved external pubkey (${pubHex.take(8)}...)")
+        storage.putString("external_pubkey", pubHex)
+        SecureLog.d("KeyStore: Saved external pubkey ${SecureLog.truncateHex(pubHex)}")
     }
 
     fun saveAmberPackageName(packageName: String) {
-        secureStorage.putString("amber_package", packageName)
+        storageOrNull()?.putString("amber_package", packageName)
         // Note: Logging removed for security
     }
 
     fun getAmberPackageName(): String? {
-        return secureStorage.getString("amber_package")
+        return storageOrNull()?.getString("amber_package")
     }
 
     fun getPubkeyHex(): String? {
-        val pubHex = secureStorage.getString("pub_hex")
-        val externalPubkey = secureStorage.getString("external_pubkey")
+        val storage = storageOrNull() ?: return inMemoryPubHex
+        val pubHex = storage.getString("pub_hex")
+        val externalPubkey = storage.getString("external_pubkey")
         val inMemory = inMemoryPubHex
         
         val source = when {
@@ -78,14 +96,14 @@ object KeyStoreManager {
             else -> "NONE"
         }
         val result = pubHex ?: externalPubkey ?: inMemory
-        println("🔍 KeyStore: getPubkeyHex() -> source=$source, pubkey=${result?.take(8) ?: "null"}...")
+        SecureLog.d("KeyStore: getPubkeyHex() source=$source pubkey=${result?.let { SecureLog.truncateHex(it) } ?: "null"}")
         
         return result
     }
 
     fun exportNpubBech32(): String? = getPubkeyHex()?.let { Nip19.encode("npub", it) }
 
-    fun exportNsecHex(): String? = inMemoryPrivHex ?: secureStorage.getString("priv_hex")
+    fun exportNsecHex(): String? = inMemoryPrivHex ?: storageOrNull()?.getString("priv_hex")
     fun exportNsecBech32(): String? = exportNsecHex()?.let { Nip19.encode("nsec", it) }
 
     /**
@@ -93,16 +111,16 @@ object KeyStoreManager {
      * Returns true if we have a pubkey but no private key.
      */
     fun isUsingAmber(): Boolean {
-        val hasExternal = secureStorage.getString("external_pubkey") != null
+        val hasExternal = storageOrNull()?.getString("external_pubkey") != null
         val hasPrivKey = exportNsecHex() != null
         return hasExternal && !hasPrivKey
     }
 
     fun clear() {
-        secureStorage.remove("priv_hex")
-        secureStorage.remove("pub_hex")
-        secureStorage.remove("external_pubkey")
-        secureStorage.remove("amber_package")
+        storageOrNull()?.remove("priv_hex")
+        storageOrNull()?.remove("pub_hex")
+        storageOrNull()?.remove("external_pubkey")
+        storageOrNull()?.remove("amber_package")
         inMemoryPrivHex = null
         inMemoryPubHex = null
     }
