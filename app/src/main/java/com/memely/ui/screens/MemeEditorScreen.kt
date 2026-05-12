@@ -634,7 +634,7 @@ fun MemeEditorScreen(
                             com.memely.nostr.NostrRepository.publishEvent(eventMessage)
                             
                             // Wait for relay responses (timeout after 5 seconds)
-                            delay(5000)
+                            delay(6000)
                             
                             // Mark any remaining pending relays as timed out
                             RelayEventTracker.getPendingRelays(actualEventId).forEach { relay ->
