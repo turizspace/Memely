@@ -36,9 +36,8 @@ fun TemplateCard(
     onClick: (MemeTemplate) -> Unit
 ) {
     val context = LocalContext.current
-    var isFavorite by remember { 
-        mutableStateOf(FavoritesManager.isFavorite(context, template.url))
-    }
+    val favorites by FavoritesManager.favoritesFlow.collectAsState()
+    val isFavorite = favorites.contains(template.url)
     var showPreview by remember { mutableStateOf(false) }
     
     Card(
@@ -125,13 +124,12 @@ fun TemplateCard(
                     // Favorite button
                     IconButton(
                         onClick = {
-                            isFavorite = !isFavorite
                             if (isFavorite) {
-                                FavoritesManager.addFavorite(context, template.url)
-                            } else {
                                 FavoritesManager.removeFavorite(context, template.url)
+                            } else {
+                                FavoritesManager.addFavorite(context, template.url)
                             }
-                            onFavoriteToggle(template.url, isFavorite)
+                            onFavoriteToggle(template.url, !isFavorite)
                         },
                         modifier = Modifier.size(36.dp)
                     ) {

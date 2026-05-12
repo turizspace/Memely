@@ -18,11 +18,7 @@ import com.memely.network.SecureHttpClient
 import com.memely.ui.viewmodels.MemeOverlayImage
 import com.memely.ui.viewmodels.MemeText
 import com.memely.ui.fonts.FontCatalog
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
-import okhttp3.OkHttpClient
+import com.memely.util.SecureLog
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
@@ -80,26 +76,46 @@ object MemeFileSaver {
         return lines.ifEmpty { listOf(text) }
     }
     
-    private suspend fun downloadImageToCache(context: Context, url: String): Uri? {
+    private fun downloadImageToCache(context: Context, url: String): Uri? {
         return try {
-            withContext(Dispatchers.IO) {
-                val httpClient = SecureHttpClient.createDownloadClient()
-                val request = Request.Builder().url(url).build()
-                httpClient.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val tempFile = File(context.cacheDir, "meme_template_${System.currentTimeMillis()}.jpg")
-                        tempFile.outputStream().use { output ->
-                            response.body?.bytes()?.let { output.write(it) }
-                        }
-                        Uri.fromFile(tempFile)
-                    } else {
-                        null
+            val httpClient = SecureHttpClient.createDownloadClient()
+            val request = Request.Builder().url(url).build()
+            httpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val tempFile = File(context.cacheDir, "meme_template_${System.currentTimeMillis()}.jpg")
+                    tempFile.outputStream().use { output ->
+                        response.body?.bytes()?.let { output.write(it) }
                     }
+                    Uri.fromFile(tempFile)
+                } else {
+                    null
                 }
             }
         } catch (e: Exception) {
-            println("❌ Failed to download image: ${e.message}")
+            SecureLog.e("MemeFileSaver: Failed to download remote image", e)
             null
+        }
+    }
+
+    private fun decodeImageBounds(context: Context, uri: Uri): IntSize? {
+        val options = android.graphics.BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            android.graphics.BitmapFactory.decodeStream(input, null, options)
+        }
+
+        return if (options.outWidth > 0 && options.outHeight > 0) {
+            IntSize(options.outWidth, options.outHeight)
+        } else {
+            null
+        }
+    }
+
+    private fun decodeBitmap(context: Context, uri: Uri): Bitmap? {
+        return context.contentResolver.openInputStream(uri)?.use { input ->
+            android.graphics.BitmapFactory.decodeStream(input)
         }
     }
     
@@ -117,23 +133,22 @@ object MemeFileSaver {
         onError: () -> Unit
     ) {
         try {
-            // For HTTP(S) URLs, try to download to cache first, but with timeout
             val resolvedUri = if (imageUri.toString().startsWith("http")) {
-                try {
-                    runBlocking {
-                        withContext(Dispatchers.IO) {
-                            // Use timeout to prevent hanging
-                            kotlinx.coroutines.withTimeoutOrNull(5000L) {
-                                downloadImageToCache(context, imageUri.toString())
-                            } ?: imageUri
-                        }
-                    }
-                } catch (e: Exception) {
-                    println("⚠️ Failed to download image, using original URI: ${e.message}")
-                    imageUri
-                }
+                downloadImageToCache(context, imageUri.toString())
             } else {
                 imageUri
+            }
+
+            if (resolvedUri == null) {
+                SecureLog.e("MemeFileSaver: Unable to resolve source image URI for saving")
+                onError()
+                return
+            }
+
+            if (baseImageSize.width <= 0 || baseImageSize.height <= 0) {
+                SecureLog.e("MemeFileSaver: Invalid displayed base image size ${baseImageSize.width}x${baseImageSize.height}")
+                onError()
+                return
             }
             
             // Get base image dimensions (use provided or decode)
@@ -141,14 +156,17 @@ object MemeFileSaver {
             var baseHeight = originalImageHeight
             
             if (baseWidth == 0 || baseHeight == 0) {
-                val baseOptions = android.graphics.BitmapFactory.Options().apply {
-                    inJustDecodeBounds = true
+                val bounds = decodeImageBounds(context, resolvedUri)
+                if (bounds != null) {
+                    baseWidth = bounds.width
+                    baseHeight = bounds.height
                 }
-                context.contentResolver.openInputStream(resolvedUri)?.use { baseStream ->
-                    android.graphics.BitmapFactory.decodeStream(baseStream, null, baseOptions)
-                }
-                baseWidth = baseOptions.outWidth
-                baseHeight = baseOptions.outHeight
+            }
+
+            if (baseWidth <= 0 || baseHeight <= 0) {
+                SecureLog.e("MemeFileSaver: Invalid source image dimensions ${baseWidth}x${baseHeight}")
+                onError()
+                return
             }
 
             // Create bitmap with original image dimensions for high quality
@@ -157,12 +175,15 @@ object MemeFileSaver {
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
             // Draw base image
-            context.contentResolver.openInputStream(resolvedUri)?.use {
-                android.graphics.BitmapFactory.decodeStream(it)?.let { baseBmp ->
-                    canvas.drawBitmap(baseBmp, 0f, 0f, paint)
-                    baseBmp.recycle()
-                }
+            val baseBmp = decodeBitmap(context, resolvedUri)
+            if (baseBmp == null) {
+                SecureLog.e("MemeFileSaver: Failed to decode source image for saving")
+                bitmap.recycle()
+                onError()
+                return
             }
+            canvas.drawBitmap(baseBmp, 0f, 0f, paint)
+            baseBmp.recycle()
 
             // Calculate scale factors between displayed size and original size
             // Use separate X and Y scales to handle any aspect ratio differences
@@ -478,8 +499,7 @@ object MemeFileSaver {
                 onSuccess(file.absolutePath)
             }
         } catch (e: Exception) {
-            println("❌ MemeEditor: Error saving meme: ${e.message}")
-            e.printStackTrace()
+            SecureLog.e("MemeFileSaver: Error saving meme", e)
             onError()
         }
     }

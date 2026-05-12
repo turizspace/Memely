@@ -1,5 +1,6 @@
 package com.memely.nostr
 
+import com.memely.util.SecureLog
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,7 +64,9 @@ object RelayConnectionManager {
      * When all references are released, may disconnect after timeout.
      */
     fun release() {
-        activeReferences.decrementAndGet()
+        activeReferences.updateAndGet { current ->
+            if (current > 0) current - 1 else 0
+        }
     }
 
     /**
@@ -102,19 +105,28 @@ object RelayConnectionManager {
             try {
                 _connectionState.value = ConnectionState.Connecting
                 
-                val info = getConnectionInfo()
+                var info = getConnectionInfo()
                 if (!info.isConnected) {
-                    println("🔄 RelayConnectionManager: Reconnecting to relays...")
+                    SecureLog.w("RelayConnectionManager: Reconnecting to relays")
                     _connectionState.value = ConnectionState.Reconnecting
                     NostrRepository.connectAll()
+                    info = getConnectionInfo()
                 }
-                
-                _connectionState.value = ConnectionState.Connected
-                println("✅ RelayConnectionManager: Relays connected (${info.connectedRelayCount}/${info.totalRelayCount})")
+
+                if (info.isConnected) {
+                    _connectionState.value = ConnectionState.Connected
+                    SecureLog.d(
+                        "RelayConnectionManager: Relays connected " +
+                            "(${info.connectedRelayCount}/${info.totalRelayCount})"
+                    )
+                } else {
+                    _connectionState.value = ConnectionState.Error
+                    SecureLog.e("RelayConnectionManager: No relay connections available after reconnect attempt")
+                }
                 
             } catch (e: Exception) {
                 _connectionState.value = ConnectionState.Error
-                println("❌ RelayConnectionManager: Connection error - ${e.message}")
+                SecureLog.e("RelayConnectionManager: Connection error", e)
                 throw e
             }
         }
@@ -129,7 +141,10 @@ object RelayConnectionManager {
             val isHealthy = info.connectedRelayCount >= info.totalRelayCount * 0.5f  // At least 50% connected
             
             if (!isHealthy) {
-                println("⚠️ RelayConnectionManager: Connection health low - ${info.connectedRelayCount}/${info.totalRelayCount}")
+                SecureLog.w(
+                    "RelayConnectionManager: Connection health low " +
+                        "(${info.connectedRelayCount}/${info.totalRelayCount})"
+                )
                 // Attempt reconnect
                 ensureConnected()
                 val recheckInfo = getConnectionInfo()
@@ -138,7 +153,7 @@ object RelayConnectionManager {
             
             true
         } catch (e: Exception) {
-            println("❌ RelayConnectionManager: Health check failed - ${e.message}")
+            SecureLog.e("RelayConnectionManager: Health check failed", e)
             false
         }
     }
@@ -150,7 +165,7 @@ object RelayConnectionManager {
         reconnectJob?.cancel()
         activeReferences.set(0)
         _connectionState.value = ConnectionState.Disconnected
-        println("🔌 RelayConnectionManager: Disconnected")
+        SecureLog.d("RelayConnectionManager: Disconnected")
     }
 
     /**
@@ -162,20 +177,20 @@ object RelayConnectionManager {
         }
         
         try {
-            println("🚀 RelayConnectionManager: Initializing persistent relay connections...")
+            SecureLog.d("RelayConnectionManager: Initializing persistent relay connections")
             _connectionState.value = ConnectionState.Connecting
             
             NostrRepository.connectAll()
             
             _connectionState.value = ConnectionState.Connected
-            println("✅ RelayConnectionManager: Persistent connections initialized")
+            SecureLog.d("RelayConnectionManager: Persistent connections initialized")
             
             // Start monitoring for disconnections
             startConnectionMonitoring()
             
         } catch (e: Exception) {
             _connectionState.value = ConnectionState.Error
-            println("❌ RelayConnectionManager: Initialization failed - ${e.message}")
+            SecureLog.e("RelayConnectionManager: Initialization failed", e)
         }
     }
 
@@ -190,15 +205,15 @@ object RelayConnectionManager {
                 
                 val info = getConnectionInfo()
                 if (info.totalRelayCount > 0 && info.connectedRelayCount == 0) {
-                    println("⚠️ RelayConnectionManager: Connection lost, auto-reconnecting...")
+                    SecureLog.w("RelayConnectionManager: Connection lost, auto-reconnecting")
                     _connectionState.value = ConnectionState.Reconnecting
                     try {
                         NostrRepository.connectAll()
                         _connectionState.value = ConnectionState.Connected
-                        println("✅ RelayConnectionManager: Auto-reconnected")
+                        SecureLog.d("RelayConnectionManager: Auto-reconnected")
                     } catch (e: Exception) {
                         _connectionState.value = ConnectionState.Error
-                        println("❌ RelayConnectionManager: Auto-reconnect failed - ${e.message}")
+                        SecureLog.e("RelayConnectionManager: Auto-reconnect failed", e)
                     }
                 }
             }

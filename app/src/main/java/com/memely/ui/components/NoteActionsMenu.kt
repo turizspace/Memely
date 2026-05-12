@@ -23,75 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.memely.nostr.NostrIdentifierFormatter
 import android.widget.Toast as AndroidToast
-
-/**
- * Converts a hex event ID to Nostr note ID syntax (bech32 format with "note1" prefix)
- * Using simple base32 encoding - for production, use a proper bech32 library
- */
-fun hexToNoteId(hexId: String): String {
-    return try {
-        // Convert hex to bytes
-        val bytes = hexId.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        
-        // Simple base32 encoding (standard RFC 4648)
-        val base32Alphabet = "abcdefghijklmnopqrstuvwxyz234567"
-        val result = StringBuilder()
-        
-        var buffer = 0
-        var bufferSize = 0
-        
-        for (byte in bytes) {
-            buffer = (buffer shl 8) or (byte.toInt() and 0xFF)
-            bufferSize += 8
-            
-            while (bufferSize >= 5) {
-                bufferSize -= 5
-                result.append(base32Alphabet[(buffer shr bufferSize) and 0x1F])
-            }
-        }
-        
-        if (bufferSize > 0) {
-            result.append(base32Alphabet[(buffer shl (5 - bufferSize)) and 0x1F])
-        }
-        
-        "note1${result.toString()}"
-    } catch (e: Exception) {
-        hexId // Fallback to hex if conversion fails
-    }
-}
-
-/**
- * Converts a hex pubkey to Nostr npub format (bech32 with "npub1" prefix)
- */
-fun hexToNpub(hexPubkey: String): String {
-    return try {
-        val bytes = hexPubkey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        val base32Alphabet = "abcdefghijklmnopqrstuvwxyz234567"
-        val result = StringBuilder()
-        
-        var buffer = 0
-        var bufferSize = 0
-        
-        for (byte in bytes) {
-            buffer = (buffer shl 8) or (byte.toInt() and 0xFF)
-            bufferSize += 8
-            
-            while (bufferSize >= 5) {
-                bufferSize -= 5
-                result.append(base32Alphabet[(buffer shr bufferSize) and 0x1F])
-            }
-        }
-        
-        if (bufferSize > 0) {
-            result.append(base32Alphabet[(buffer shl (5 - bufferSize)) and 0x1F])
-        }
-        
-        "npub1${result.toString()}"
-    } catch (e: Exception) {
-        hexPubkey // Fallback to hex if conversion fails
-    }
-}
 
 @Composable
 fun NoteActionsMenu(
@@ -119,7 +52,7 @@ fun NoteActionsMenu(
             // Copy npub
             DropdownMenuItem(
                 onClick = {
-                    val npub = hexToNpub(pubkey)
+                    val npub = NostrIdentifierFormatter.toNpub(pubkey)
                     copyToClipboard(context, npub, "npub copied")
                     expanded.value = false
                 }
@@ -127,7 +60,7 @@ fun NoteActionsMenu(
                 Column {
                     Text("Copy npub", style = MaterialTheme.typography.body2)
                     Text(
-                        hexToNpub(pubkey).take(20) + "...",
+                        NostrIdentifierFormatter.toNpub(pubkey).take(20) + "...",
                         style = MaterialTheme.typography.caption,
                         color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                         fontFamily = FontFamily.Monospace
@@ -156,7 +89,7 @@ fun NoteActionsMenu(
             // Copy note ID
             DropdownMenuItem(
                 onClick = {
-                    val noteIdBech32 = hexToNoteId(noteId)
+                    val noteIdBech32 = NostrIdentifierFormatter.toNoteId(noteId)
                     copyToClipboard(context, noteIdBech32, "Note ID copied")
                     expanded.value = false
                 }
@@ -164,7 +97,7 @@ fun NoteActionsMenu(
                 Column {
                     Text("Copy note ID", style = MaterialTheme.typography.body2)
                     Text(
-                        hexToNoteId(noteId).take(20) + "...",
+                        NostrIdentifierFormatter.toNoteId(noteId).take(20) + "...",
                         style = MaterialTheme.typography.caption,
                         color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
                         fontFamily = FontFamily.Monospace

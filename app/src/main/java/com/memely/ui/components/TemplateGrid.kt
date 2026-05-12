@@ -11,6 +11,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -81,8 +82,12 @@ fun TemplateGrid(
             }
             else -> {
                 // Save scroll position whenever grid state changes
-                LaunchedEffect(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset) {
-                    TemplateGridScrollState.saveScrollPosition(gridState)
+                LaunchedEffect(gridState) {
+                    snapshotFlow {
+                        gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
+                    }.collect {
+                        TemplateGridScrollState.saveScrollPosition(gridState)
+                    }
                 }
                 
                 // Show grid of templates with managed scroll state

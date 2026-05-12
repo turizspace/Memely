@@ -12,20 +12,24 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
+import com.memely.di.appContainer
+import com.memely.di.viewModelFactory
 import com.memely.data.TemplateRepository
 import com.memely.nostr.*
 import com.memely.ui.components.BottomBar
 import com.memely.ui.components.UserTopBar
 import com.memely.ui.screens.*
 import com.memely.ui.tutorial.TutorialManager
+import com.memely.ui.viewmodels.AppRootViewModel
+import com.memely.ui.viewmodels.AuthenticatedRootViewModel
 import com.memely.util.SecureLog
 
 class MainActivity : ComponentActivity() {
@@ -34,13 +38,13 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         result.data?.let { intent ->
-            println("🔄 MainActivity: Amber launcher callback received")
+            SecureLog.d("MainActivity: Amber launcher callback received")
             
             // Get the request ID to determine if this was a login or signing request
             val requestId = intent.getStringExtra("id")
             val isLogin = requestId != null && AmberSignerManager.isLoginRequest(requestId)
             
-            println("🔍 MainActivity: Request ID=$requestId, isLogin=$isLogin")
+            SecureLog.d("MainActivity: Request ${requestId ?: "unknown"} isLogin=$isLogin")
             
             // Let AmberSignerManager handle the response (it manages pending requests)
             AmberSignerManager.handleIntentResponse(intent)
@@ -48,17 +52,15 @@ class MainActivity : ComponentActivity() {
             val pubkey = intent.getStringExtra("result")
             val packageName = intent.getStringExtra("package") ?: "com.greenart7c3.nostrsigner"
             
-            println("🔑 MainActivity: Amber callback - pubkey=${pubkey?.take(8)}..., package=$packageName")
+            SecureLog.d("MainActivity: Amber callback package=$packageName pubkey=${pubkey?.let { SecureLog.truncateHex(it) }}")
             
             // Only save pubkey if this is a LOGIN request
             if (isLogin && !pubkey.isNullOrBlank()) {
-                println("✅ MainActivity: This is a LOGIN response - saving pubkey")
+                SecureLog.d("MainActivity: Persisting Amber login response")
                 KeyStoreManager.saveExternalPubkey(pubkey)
                 KeyStoreManager.saveAmberPackageName(packageName)
                 AmberSignerManager.configure(pubkey, packageName)
                 com.memely.nostr.AuthStateManager.refresh()
-            } else if (!isLogin) {
-                println("ℹ️ MainActivity: This is a SIGNING response - NOT updating stored pubkey")
             }
         }
     }
@@ -71,19 +73,16 @@ class MainActivity : ComponentActivity() {
             WindowManager.LayoutParams.FLAG_SECURE,
             WindowManager.LayoutParams.FLAG_SECURE
         )
-        
-        KeyStoreManager.init(applicationContext)
 
         // Restore Amber configuration if user logged in with Amber
         if (KeyStoreManager.isUsingAmber()) {
             val pubkey = KeyStoreManager.getPubkeyHex()
             val packageName = KeyStoreManager.getAmberPackageName()
-            println("🔄 MainActivity.onCreate: Restoring Amber config - pubkey=${pubkey?.take(8)}..., package=$packageName")
             if (pubkey != null && packageName != null) {
                 AmberSignerManager.configure(pubkey, packageName)
-                println("✅ MainActivity: Restored external signer config")
+                SecureLog.d("MainActivity: Restored Amber signer configuration")
             } else {
-                println("⚠️ MainActivity: isUsingAmber=true but missing pubkey or package!")
+                SecureLog.w("MainActivity: Amber flagged as active but persisted state is incomplete")
             }
         }
 
@@ -107,34 +106,32 @@ class MainActivity : ComponentActivity() {
 
     private fun handleAmberCallback(intent: Intent?) {
         if (intent?.scheme == "nostrsigner") {
-            println("🔗 MainActivity: Received nostrsigner callback intent")
+            SecureLog.d("MainActivity: Received nostrsigner callback")
             // Validate intent before processing (security check)
             if (validateAmberIntent(intent)) {
                 // Get the request ID to determine if this was a login or signing request
                 val requestId = intent.getStringExtra("id")
                 val isLogin = requestId != null && AmberSignerManager.isLoginRequest(requestId)
                 
-                println("🔍 MainActivity: Callback Request ID=$requestId, isLogin=$isLogin")
+                SecureLog.d("MainActivity: Callback request ${requestId ?: "unknown"} isLogin=$isLogin")
                 
                 AmberSignerManager.handleIntentResponse(intent)
                 
                 val pubkey = intent.getStringExtra("result")
                 val packageName = intent.getStringExtra("package") ?: "com.greenart7c3.nostrsigner"
                 
-                println("🔑 MainActivity: Callback - pubkey=${pubkey?.take(8)}..., package=$packageName")
+                SecureLog.d("MainActivity: Callback package=$packageName pubkey=${pubkey?.let { SecureLog.truncateHex(it) }}")
                 
                 // Only update stored pubkey on actual login (get_public_key), not on signing responses
                 if (isLogin && !pubkey.isNullOrBlank()) {
-                    println("✅ MainActivity: This is a LOGIN callback - saving pubkey")
+                    SecureLog.d("MainActivity: Persisting Amber login callback")
                     KeyStoreManager.saveExternalPubkey(pubkey)
                     KeyStoreManager.saveAmberPackageName(packageName)
                     AmberSignerManager.configure(pubkey, packageName)
                     com.memely.nostr.AuthStateManager.refresh()
-                } else if (!isLogin) {
-                    println("ℹ️ MainActivity: This is a SIGNING callback - NOT updating stored pubkey")
                 }
             } else {
-                println("⚠️ Invalid nostrsigner intent received - ignoring")
+                SecureLog.w("MainActivity: Ignoring invalid nostrsigner callback")
             }
         }
     }
@@ -145,12 +142,40 @@ class MainActivity : ComponentActivity() {
      */
     private fun validateAmberIntent(intent: Intent): Boolean {
         return try {
-            // Ensure intent has expected extras
+            if (intent.action != null && intent.action != Intent.ACTION_VIEW) {
+                return false
+            }
+
+            if (intent.scheme != "nostrsigner") {
+                return false
+            }
+
             val id = intent.getStringExtra("id")
             val result = intent.getStringExtra("result")
-            
-            // At minimum, should have an ID
-            !id.isNullOrBlank()
+            val event = intent.getStringExtra("event")
+
+            if (id.isNullOrBlank() || id.length > 128 || !id.matches(Regex("^[A-Za-z0-9_-]+$"))) {
+                return false
+            }
+
+            if (!intent.hasExtra("result") && !intent.hasExtra("event") && !intent.hasExtra("package")) {
+                return false
+            }
+
+            if (result != null && result.length > 10000) {
+                return false
+            }
+
+            if (event != null) {
+                if (event.length > 100000) {
+                    return false
+                }
+                runCatching { org.json.JSONObject(event) }.getOrElse {
+                    return false
+                }
+            }
+
+            true
         } catch (e: Exception) {
             SecureLog.e("Error validating intent", e)
             false
@@ -161,59 +186,41 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppRoot(openUrl: (Intent) -> Unit) {
     val context = LocalContext.current
-    val loggedIn by com.memely.nostr.AuthStateManager.isLoggedIn.collectAsState()
-    var isInitialized by remember { mutableStateOf(false) }
-    var currentTheme by remember {
-        mutableStateOf(com.memely.ui.theme.ThemeManager.getThemePreference(context))
-    }
-    
-    // Initialize TutorialManager
-    LaunchedEffect(Unit) {
-        TutorialManager.initialize(context)
-        isInitialized = true
-    }
-    
+    val appContainer = remember(context) { context.appContainer }
+    val appRootViewModel: AppRootViewModel = viewModel(
+        factory = remember(appContainer) {
+            viewModelFactory {
+                AppRootViewModel(
+                    sessionRepository = appContainer.sessionRepository,
+                    themeRepository = appContainer.themeRepository
+                )
+            }
+        }
+    )
+    val uiState by appRootViewModel.uiState.collectAsState()
+
     // Start tutorial if user is logged in and hasn't completed it
-    LaunchedEffect(loggedIn) {
-        if (loggedIn && TutorialManager.shouldShowTutorial()) {
+    LaunchedEffect(uiState.isLoggedIn) {
+        if (uiState.isLoggedIn && TutorialManager.shouldShowTutorial()) {
             TutorialManager.startTutorial()
         }
     }
 
-    // Wait for initialization before showing any screen
-    if (!isInitialized) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator()
-        }
-        return
-    }
-
     com.memely.ui.theme.MemelyTheme(
-        isDarkMode = com.memely.ui.theme.isDarkTheme(currentTheme)
+        isDarkMode = com.memely.ui.theme.isDarkTheme(uiState.currentTheme)
     ) {
         when {
-            !loggedIn -> {
+            !uiState.isLoggedIn -> {
                 LoginScreen(
-                    onLoggedIn = {
-                        com.memely.nostr.AuthStateManager.refresh()
-                    },
+                    onLoggedIn = appRootViewModel::refreshAuth,
                     openUrl = openUrl
                 )
             }
             else -> {
                 AuthenticatedRoot(
-                    currentTheme = currentTheme,
-                    onThemeChange = { newTheme ->
-                        currentTheme = newTheme
-                    },
-                    onLogout = {
-                        // Clear all stored keys and credentials
-                        KeyStoreManager.clear()
-                        com.memely.nostr.AuthStateManager.refresh()
-                    }
+                    currentTheme = uiState.currentTheme,
+                    onThemeChange = appRootViewModel::updateTheme,
+                    onLogout = appRootViewModel::logout
                 )
             }
         }
@@ -229,16 +236,27 @@ fun AuthenticatedRoot(
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+    val context = LocalContext.current
+    val appContainer = remember(context) { context.appContainer }
+    val authenticatedRootViewModel: AuthenticatedRootViewModel = viewModel(
+        factory = remember(appContainer) {
+            viewModelFactory {
+                AuthenticatedRootViewModel(
+                    sessionRepository = appContainer.sessionRepository,
+                    profileRepository = appContainer.profileRepository
+                )
+            }
+        }
+    )
+    val rootUiState by authenticatedRootViewModel.uiState.collectAsState()
     
     // Shared state for meme editor image URI - avoids navigation encoding issues
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     
     // Theme state management
-    val context = LocalContext.current
     var themeState by remember { 
         mutableStateOf(currentTheme)
     }
-    val isDarkMode = com.memely.ui.theme.isDarkTheme(themeState)
     
     // Get available templates for tutorial
     val availableTemplates by TemplateRepository.templatesFlow.collectAsState()
@@ -298,58 +316,32 @@ fun AuthenticatedRoot(
         else -> BottomNavScreen.Home
     }
 
-    // FIX: Don't cache pubkey - re-read it when auth state changes so Amber login works
-    val loggedInState by com.memely.nostr.AuthStateManager.isLoggedIn.collectAsState()
-    val pubkeyHex = remember(loggedInState) { KeyStoreManager.getPubkeyHex() }
-    
-    // Use state flows directly
-    val connectedRelays by NostrRepository.connectedRelaysFlow.collectAsState()
-    val userMetadata by NostrRepository.metadataState.collectAsState()
-    
-    // CRITICAL FIX: Use RelayManager's effective relays which updates when user relays are found
-    val effectiveRelays by RelayManager.effectiveRelays.collectAsState()
-    val totalRelays = effectiveRelays.size
+    val pubkeyHex = rootUiState.pubkeyHex
+    val connectedRelays = rootUiState.connectedRelays
+    val totalRelays = rootUiState.totalRelays
+    val userMetadata = rootUiState.userMetadata
 
     // Debug relay changes
-    LaunchedEffect(effectiveRelays, connectedRelays) {
+    LaunchedEffect(connectedRelays, totalRelays) {
         SecureLog.d("Relay status: $connectedRelays/$totalRelays connected")
     }
 
     LaunchedEffect(pubkeyHex) {
-        SecureLog.d("Starting Nostr connection")
-        
-        NostrRepository.connectAll()
-        
-        if (!pubkeyHex.isNullOrBlank()) {
-            NostrRepository.startProfileListener(pubkeyHex)
-        }
+        authenticatedRootViewModel.startSession(pubkeyHex)
     }
 
     // Fetch profile data when we have connections
     LaunchedEffect(connectedRelays, pubkeyHex) {
-        println("🔌 MainActivity: Connection state - connected: $connectedRelays/$totalRelays")
-        
-        if (!pubkeyHex.isNullOrBlank() && connectedRelays > 0) {
-            println("📡 MainActivity: Fetching user profile and relays...")
-            
-            val (metadata, relays) = NostrRepository.fetchUserProfile(pubkeyHex)
-            
-            // Only update UI if we got real data
-            if (metadata?.name != "Memely User" || relays.isNotEmpty()) {
-                println("🎯 MainActivity: Profile fetch completed - name: '${metadata?.name ?: "null"}', relays: ${relays.size}")
-            } else {
-                println("⚠️ MainActivity: Profile fetch returned fallback data, waiting for real data...")
-            }
-        }
+        authenticatedRootViewModel.refreshProfileIfNeeded(pubkeyHex, connectedRelays)
     }
     
     // Debug logging - improved
     LaunchedEffect(userMetadata) {
         val name = userMetadata?.name ?: "null"
         if (name != "Memely User") {
-            println("👤 MainActivity: UI metadata updated - REAL name: '$name'")
+            SecureLog.d("MainActivity: UI metadata updated name='$name'")
         } else {
-            println("👤 MainActivity: UI metadata updated - FALLBACK name: '$name'")
+            SecureLog.d("MainActivity: UI metadata still using fallback metadata")
         }
     }
 
@@ -419,8 +411,7 @@ fun AuthenticatedRoot(
                         imageUri = selectedImageUri!!,
                         onDone = { savedPath ->
                             if (savedPath.isNotEmpty()) {
-                                // Meme was saved successfully
-                                println("✅ Meme saved to: $savedPath")
+                                SecureLog.d("MainActivity: Meme saved successfully")
                             }
                             // Navigate back to home screen
                             selectedImageUri = null

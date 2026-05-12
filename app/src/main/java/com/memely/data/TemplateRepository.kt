@@ -2,11 +2,13 @@ package com.memely.data
 
 import android.content.Context
 import com.memely.network.SecureHttpClient
+import com.memely.util.SecureLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import com.memely.nostr.Constants
@@ -22,6 +24,7 @@ data class MemeTemplate(
 
 object TemplateRepository {
     private val httpClient = SecureHttpClient.createDownloadClient()
+    private val fetchMutex = Mutex()
     
     private val _templatesFlow = MutableStateFlow<List<MemeTemplate>>(emptyList())
     val templatesFlow: StateFlow<List<MemeTemplate>> = _templatesFlow
@@ -74,34 +77,51 @@ object TemplateRepository {
         }
     }
     
-    suspend fun fetchTemplates() {
-        _isLoadingFlow.value = true
-        _errorFlow.value = null
-        
-        try {
-            withContext(Dispatchers.IO) {
-                val request = Request.Builder()
-                    .url(Constants.MEME_TEMPLATES_API)
-                    .build()
-                
-                httpClient.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
+    suspend fun fetchTemplates(forceRefresh: Boolean = false) {
+        fetchMutex.withLock {
+            if (_isLoadingFlow.value) {
+                return
+            }
+            if (!forceRefresh && _templatesFlow.value.isNotEmpty()) {
+                return
+            }
+
+            _isLoadingFlow.value = true
+            _errorFlow.value = null
+
+            try {
+                val templates = withContext(Dispatchers.IO) {
+                    val request = Request.Builder()
+                        .url(Constants.MEME_TEMPLATES_API)
+                        .build()
+
+                    httpClient.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) {
+                            throw Exception("API error: ${response.code}")
+                        }
+
                         val body = response.body?.string() ?: "{}"
                         val json = JSONObject(body)
-                        
-                        if (json.optBoolean("success", false)) {
-                            val templatesArray = json.optJSONArray("templates") ?: org.json.JSONArray()
-                            val templates = mutableListOf<MemeTemplate>()
-                            
+                        if (!json.optBoolean("success", false)) {
+                            throw Exception("API returned success=false")
+                        }
+
+                        val templatesArray = json.optJSONArray("templates") ?: org.json.JSONArray()
+                        buildList {
                             for (i in 0 until templatesArray.length()) {
                                 val templateObj = templatesArray.getJSONObject(i)
+                                val rawUrl = templateObj.optString("url", "").trim()
+                                if (rawUrl.isBlank()) {
+                                    continue
+                                }
+
                                 val widthValue = if (templateObj.has("width")) templateObj.getInt("width") else null
                                 val heightValue = if (templateObj.has("height")) templateObj.getInt("height") else null
-                                
-                                templates.add(
+
+                                add(
                                     MemeTemplate(
-                                        name = templateObj.optString("name", "Unknown"),
-                                        url = templateObj.optString("url", ""),
+                                        name = templateObj.optString("name", "Unknown").trim().ifBlank { "Unknown" },
+                                        url = rawUrl,
                                         size = templateObj.optLong("size", 0),
                                         width = widthValue,
                                         height = heightValue,
@@ -109,23 +129,19 @@ object TemplateRepository {
                                     )
                                 )
                             }
-                            
-                            _templatesFlow.value = templates
-                            println("✅ TemplateRepository: Loaded ${templates.size} templates")
-                        } else {
-                            throw Exception("API returned success=false")
-                        }
-                    } else {
-                        throw Exception("API error: ${response.code}")
+                        }.distinctBy { it.url }
                     }
                 }
+
+                _templatesFlow.value = templates
+                SecureLog.i("TemplateRepository: Loaded ${templates.size} templates")
+            } catch (e: Exception) {
+                val errorMsg = "Failed to load templates: ${e.message}"
+                _errorFlow.value = errorMsg
+                SecureLog.e("TemplateRepository: $errorMsg", e)
+            } finally {
+                _isLoadingFlow.value = false
             }
-        } catch (e: Exception) {
-            val errorMsg = "Failed to load templates: ${e.message}"
-            _errorFlow.value = errorMsg
-            println("❌ TemplateRepository: $errorMsg")
-        } finally {
-            _isLoadingFlow.value = false
         }
     }
 }

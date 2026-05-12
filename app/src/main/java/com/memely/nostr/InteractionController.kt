@@ -1,10 +1,8 @@
 package com.memely.nostr
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.memely.util.SecureLog
 import org.json.JSONArray
 import org.json.JSONObject
-import java.time.Instant
 
 /**
  * Handles creation of interaction events (reactions, replies, reposts) per Nostr specs
@@ -13,6 +11,7 @@ import java.time.Instant
  * - NIP-1: Text notes (kind 1) for replies
  */
 object InteractionController {
+    private fun currentEpochSeconds(): Long = System.currentTimeMillis() / 1000L
     
     /**
      * Create a reaction event (kind 7) per NIP-25
@@ -29,9 +28,12 @@ object InteractionController {
         userPubkey: String,
         relayUrl: String? = null
     ): NostrEvent {
-        println("🏗️ InteractionController.createReactionEvent: userPubkey=${userPubkey.take(8)}..., targetEvent=${targetEventId.take(8)}...")
+        SecureLog.d(
+            "InteractionController: Creating reaction " +
+                "user=${SecureLog.truncateHex(userPubkey)} target=${SecureLog.truncateHex(targetEventId)}"
+        )
         
-        val now = Instant.now().epochSecond
+        val now = currentEpochSeconds()
         
         // Build tags array
         val tags = JSONArray()
@@ -68,7 +70,7 @@ object InteractionController {
             pubkey = userPubkey
         )
         
-        println("✅ Created reaction event - pubkey field set to: ${event.pubkey.take(8)}...")
+        SecureLog.d("InteractionController: Created reaction event for ${SecureLog.truncateHex(event.pubkey)}")
         
         return event
     }
@@ -88,7 +90,7 @@ object InteractionController {
         originalEventJson: String? = null,
         relayUrl: String? = null
     ): NostrEvent {
-        val now = Instant.now().epochSecond
+        val now = currentEpochSeconds()
         
         // Build tags array
         val tags = JSONArray()
@@ -138,7 +140,7 @@ object InteractionController {
         userPubkey: String,
         relayUrl: String? = null
     ): NostrEvent {
-        val now = Instant.now().epochSecond
+        val now = currentEpochSeconds()
         
         // Build tags array
         val tags = JSONArray()
