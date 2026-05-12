@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -36,11 +37,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
-import com.memely.data.InteractionRepository
+import com.memely.di.appContainer
 import com.memely.nostr.MemeNote
 import com.memely.nostr.UserMetadataCache
 import com.memely.nostr.MetadataParser
-import com.memely.nostr.InteractionPublisher
+import com.memely.util.SecureLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
@@ -51,22 +52,13 @@ fun ThreadViewDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isLoading = remember { mutableStateOf(true) }
-    val replies = remember { mutableStateOf<List<MemeNote>>(emptyList()) }
-    val error = remember { mutableStateOf<String?>(null) }
-    
+    val context = LocalContext.current
+    val interactionRepository = remember(context) { context.appContainer.interactionRepository }
+    val interactionState by interactionRepository.observeInteractions(eventId).collectAsState()
+    val replies = interactionState.counts?.replies.orEmpty()
+
     LaunchedEffect(eventId) {
-        try {
-            isLoading.value = true
-            val interactions = InteractionRepository.fetchInteractions(eventId)
-            replies.value = interactions?.replies ?: emptyList()
-            println("📖 ThreadViewDialog: Loaded ${replies.value.size} replies for $eventId")
-        } catch (e: Exception) {
-            error.value = "Failed to load thread: ${e.message}"
-            println("❌ ThreadViewDialog: Error fetching replies: ${e.message}")
-        } finally {
-            isLoading.value = false
-        }
+        interactionRepository.refreshInteractions(eventId)
     }
     
     Dialog(
@@ -109,7 +101,7 @@ fun ThreadViewDialog(
                             color = MaterialTheme.colors.onSurface
                         )
                         Text(
-                            text = "${replies.value.size} ${if (replies.value.size == 1) "reply" else "replies"}",
+                            text = "${replies.size} ${if (replies.size == 1) "reply" else "replies"}",
                             style = MaterialTheme.typography.caption,
                             color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
                         )
@@ -131,20 +123,20 @@ fun ThreadViewDialog(
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     when {
-                        isLoading.value -> {
+                        interactionState.isLoading && replies.isEmpty() -> {
                             CircularProgressIndicator(
                                 modifier = Modifier.align(Alignment.Center)
                             )
                         }
-                        error.value != null -> {
+                        interactionState.error != null && replies.isEmpty() -> {
                             Text(
-                                text = error.value ?: "Unknown error",
+                                text = interactionState.error ?: "Unknown error",
                                 color = MaterialTheme.colors.error,
                                 modifier = Modifier.align(Alignment.Center),
                                 textAlign = TextAlign.Center
                             )
                         }
-                        replies.value.isEmpty() -> {
+                        replies.isEmpty() -> {
                             Text(
                                 text = "No replies yet\nBe the first to reply!",
                                 color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
@@ -158,7 +150,7 @@ fun ThreadViewDialog(
                                 modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                items(replies.value) { reply ->
+                                items(replies) { reply ->
                                     ReplyThreadItem(reply = reply)
                                 }
                             }
@@ -172,6 +164,10 @@ fun ThreadViewDialog(
 
 @Composable
 private fun ReplyThreadItem(reply: MemeNote) {
+    val context = LocalContext.current
+    val appContainer = remember(context) { context.appContainer }
+    val interactionRepository = appContainer.interactionRepository
+    val interactionPublisher = appContainer.interactionPublisher
     val authorMetadata = remember { mutableStateOf<MetadataParser.UserMetadata?>(null) }
     val scope = rememberCoroutineScope()
     
@@ -195,10 +191,10 @@ private fun ReplyThreadItem(reply: MemeNote) {
         val cached = UserMetadataCache.getCachedMetadata(reply.pubkey)
         if (cached != null) {
             authorMetadata.value = cached
-            println("📖 ThreadViewDialog: Loaded metadata for ${reply.pubkey.take(8)}: ${cached.name}")
+            SecureLog.d("ThreadViewDialog: Loaded cached metadata for ${SecureLog.truncateHex(reply.pubkey)}")
         } else {
             // Request async fetch if not cached
-            println("🔍 ThreadViewDialog: Requesting metadata for ${reply.pubkey.take(8)}")
+            SecureLog.d("ThreadViewDialog: Requesting metadata for ${SecureLog.truncateHex(reply.pubkey)}")
             UserMetadataCache.requestMetadataAsync(reply.pubkey)
         }
     }
@@ -217,7 +213,7 @@ private fun ReplyThreadItem(reply: MemeNote) {
                 .fillMaxWidth()
                 .clickable { 
                     showNestedThread = true 
-                    println("🔗 Opening nested thread for reply ${reply.id.take(8)}")
+                    SecureLog.d("ThreadViewDialog: Opening nested thread ${SecureLog.truncateHex(reply.id)}")
                 }
         ) {
             // Author section with avatar and metadata
@@ -350,16 +346,14 @@ private fun ReplyThreadItem(reply: MemeNote) {
                     scope.launch {
                         try {
                             isPublishingReaction = true
-                            println("❤️ ThreadViewDialog: Publishing reaction $emoji to ${reply.id.take(8)}")
-                            InteractionPublisher.publishReaction(
+                            interactionPublisher.publishReaction(
                                 targetEventId = reply.id,
                                 targetPubkey = reply.pubkey,
                                 content = emoji
                             )
-                            println("✅ ThreadViewDialog: Reaction published")
-                            InteractionRepository.invalidateCache(reply.id)
+                            interactionRepository.invalidateCache(reply.id)
                         } catch (e: Exception) {
-                            println("❌ ThreadViewDialog: Failed to publish reaction: ${e.message}")
+                            SecureLog.e("ThreadViewDialog: Failed to publish reaction", e)
                         } finally {
                             isPublishingReaction = false
                         }
@@ -369,16 +363,14 @@ private fun ReplyThreadItem(reply: MemeNote) {
                     scope.launch {
                         try {
                             isPublishingRepost = true
-                            println("🔄 ThreadViewDialog: Publishing repost of ${reply.id.take(8)}")
-                            InteractionPublisher.publishRepost(
+                            interactionPublisher.publishRepost(
                                 targetEventId = reply.id,
                                 targetPubkey = reply.pubkey,
                                 originalEventJson = reply.toJson()
                             )
-                            println("✅ ThreadViewDialog: Repost published")
-                            InteractionRepository.invalidateCache(reply.id)
+                            interactionRepository.invalidateCache(reply.id)
                         } catch (e: Exception) {
-                            println("❌ ThreadViewDialog: Failed to publish repost: ${e.message}")
+                            SecureLog.e("ThreadViewDialog: Failed to publish repost", e)
                         } finally {
                             isPublishingRepost = false
                         }
@@ -396,19 +388,16 @@ private fun ReplyThreadItem(reply: MemeNote) {
                 scope.launch {
                     try {
                         isSubmittingReply = true
-                        println("💬 ThreadViewDialog: Submitting reply to ${reply.id.take(8)}: $replyText")
-                        
-                        InteractionPublisher.publishReply(
+                        interactionPublisher.publishReply(
                             content = replyText,
                             replyToEventId = reply.id,
                             replyToPubkey = reply.pubkey
                         )
                         
-                        println("✅ ThreadViewDialog: Reply published successfully")
                         showReplyDialog = false
-                        InteractionRepository.invalidateCache(reply.id)
+                        interactionRepository.invalidateCache(reply.id)
                     } catch (e: Exception) {
-                        println("❌ ThreadViewDialog: Failed to publish reply: ${e.message}")
+                        SecureLog.e("ThreadViewDialog: Failed to publish reply", e)
                     } finally {
                         isSubmittingReply = false
                     }

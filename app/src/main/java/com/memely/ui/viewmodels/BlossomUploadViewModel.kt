@@ -2,13 +2,15 @@ package com.memely.ui.viewmodels
 
 import android.content.Context
 import android.net.Uri
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.memely.blossom.BlossomClient
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -16,7 +18,7 @@ import java.io.File
  */
 class BlossomUploadViewModel(
     private val blossomClient: BlossomClient = BlossomClient()
-) {
+) : ViewModel() {
     sealed class UploadState {
         object Idle : UploadState()
         data class Uploading(val bytesSent: Long, val totalBytes: Long) : UploadState()
@@ -24,8 +26,8 @@ class BlossomUploadViewModel(
         data class Error(val message: String?) : UploadState()
     }
 
-    var uploadState by mutableStateOf<UploadState>(UploadState.Idle)
-        private set
+    private val _uploadState = MutableStateFlow<UploadState>(UploadState.Idle)
+    val uploadState: StateFlow<UploadState> = _uploadState.asStateFlow()
 
     /**
      * Upload a file to Blossom server.
@@ -43,31 +45,31 @@ class BlossomUploadViewModel(
         pubkeyHex: String,
         signEventFunc: suspend (eventJson: String) -> String,
         endpoint: String = "upload",
-        coroutineScope: CoroutineScope,
         onSuccess: ((String) -> Unit)? = null
     ) {
-        coroutineScope.launch(Dispatchers.IO) {
-            uploadState = UploadState.Uploading(0, file.length())
-            
-            val result = blossomClient.uploadFile(
-                file = file,
-                contentType = contentType,
-                pubkeyHex = pubkeyHex,
-                signEventFunc = signEventFunc,
-                endpoint = endpoint
-            ) { sent, total ->
-                uploadState = UploadState.Uploading(sent, total)
+        viewModelScope.launch {
+            _uploadState.value = UploadState.Uploading(0, file.length())
+
+            val result = withContext(Dispatchers.IO) {
+                blossomClient.uploadFile(
+                    file = file,
+                    contentType = contentType,
+                    pubkeyHex = pubkeyHex,
+                    signEventFunc = signEventFunc,
+                    endpoint = endpoint
+                ) { sent, total ->
+                    _uploadState.value = UploadState.Uploading(sent, total)
+                }
             }
 
             if (result.ok) {
-                // Parse URL from response
-                val url = blossomClient.parseUploadUrl(result.body) 
+                val url = blossomClient.parseUploadUrl(result.body)
                     ?: "${blossomClient.baseUrl}/$endpoint/${file.name}"
-                
-                uploadState = UploadState.Success(url)
+
+                _uploadState.value = UploadState.Success(url)
                 onSuccess?.invoke(url)
             } else {
-                uploadState = UploadState.Error(
+                _uploadState.value = UploadState.Error(
                     "Upload failed: ${result.statusCode} ${result.body ?: "Unknown error"}"
                 )
             }
@@ -93,41 +95,42 @@ class BlossomUploadViewModel(
         pubkeyHex: String,
         signEventFunc: suspend (eventJson: String) -> String,
         endpoint: String = "upload",
-        coroutineScope: CoroutineScope,
         onSuccess: ((String) -> Unit)? = null
     ) {
-        coroutineScope.launch(Dispatchers.IO) {
-            // Get file size for initial state
+        viewModelScope.launch {
             val fileSize = try {
-                context.contentResolver.openFileDescriptor(uri, "r")?.use { fd ->
-                    fd.statSize
-                } ?: 0L
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openFileDescriptor(uri, "r")?.use { fd ->
+                        fd.statSize
+                    } ?: 0L
+                }
             } catch (e: Exception) {
                 0L
             }
-            
-            uploadState = UploadState.Uploading(0, fileSize)
-            
-            val result = blossomClient.uploadFile(
-                context = context,
-                uri = uri,
-                contentType = contentType,
-                pubkeyHex = pubkeyHex,
-                signEventFunc = signEventFunc,
-                endpoint = endpoint
-            ) { sent, total ->
-                uploadState = UploadState.Uploading(sent, total)
+
+            _uploadState.value = UploadState.Uploading(0, fileSize)
+
+            val result = withContext(Dispatchers.IO) {
+                blossomClient.uploadFile(
+                    context = context,
+                    uri = uri,
+                    contentType = contentType,
+                    pubkeyHex = pubkeyHex,
+                    signEventFunc = signEventFunc,
+                    endpoint = endpoint
+                ) { sent, total ->
+                    _uploadState.value = UploadState.Uploading(sent, total)
+                }
             }
 
             if (result.ok) {
-                // Parse URL from response
-                val url = blossomClient.parseUploadUrl(result.body) 
+                val url = blossomClient.parseUploadUrl(result.body)
                     ?: "${blossomClient.baseUrl}/$endpoint"
-                
-                uploadState = UploadState.Success(url)
+
+                _uploadState.value = UploadState.Success(url)
                 onSuccess?.invoke(url)
             } else {
-                uploadState = UploadState.Error(
+                _uploadState.value = UploadState.Error(
                     "Upload failed: ${result.statusCode} ${result.body ?: "Unknown error"}"
                 )
             }
@@ -135,6 +138,6 @@ class BlossomUploadViewModel(
     }
 
     fun reset() {
-        uploadState = UploadState.Idle
+        _uploadState.value = UploadState.Idle
     }
 }

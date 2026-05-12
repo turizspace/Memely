@@ -15,6 +15,23 @@ import java.util.concurrent.TimeUnit
  * Generate pins using: openssl s_client -connect domain.com:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64
  */
 object SecureHttpClient {
+    private val webSocketClient: OkHttpClient by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        createSecureClient(
+            enablePinning = false,
+            connectTimeoutSeconds = 15,
+            readTimeoutSeconds = 0,
+            writeTimeoutSeconds = 30
+        )
+    }
+
+    private val downloadClient: OkHttpClient by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        createSecureClient(
+            enablePinning = false,
+            connectTimeoutSeconds = 10,
+            readTimeoutSeconds = 60,
+            writeTimeoutSeconds = 30
+        )
+    }
     
     /**
      * Create a secure OkHttpClient with certificate pinning for relay connections.
@@ -71,23 +88,13 @@ object SecureHttpClient {
      * Uses the same security settings as HTTP client.
      */
     fun createWebSocketClient(): OkHttpClient {
-        return createSecureClient(
-            enablePinning = false, // Disable until relay-specific pins configured
-            connectTimeoutSeconds = 15,
-            readTimeoutSeconds = 0,  // No timeout for WebSocket (long-lived)
-            writeTimeoutSeconds = 30
-        )
+        return webSocketClient
     }
     
     /**
      * Create a client for image/template downloads with stricter timeouts.
      */
     fun createDownloadClient(): OkHttpClient {
-        return createSecureClient(
-            enablePinning = false, // Templates from various CDNs
-            connectTimeoutSeconds = 10,
-            readTimeoutSeconds = 60,
-            writeTimeoutSeconds = 30
-        )
+        return downloadClient
     }
 }

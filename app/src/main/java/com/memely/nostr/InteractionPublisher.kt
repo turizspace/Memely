@@ -1,240 +1,209 @@
 package com.memely.nostr
 
+import com.memely.util.SecureLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import org.json.JSONArray
 
 /**
  * Handles signing and publishing interaction events (reactions, replies, reposts)
- * Supports both Amber signer and nsec-based signing
+ * Supports both Amber signer and nsec-based signing.
  */
-object InteractionPublisher {
-    
-    /**
-     * Sign and publish a reaction event
-     */
+interface InteractionPublisher {
     suspend fun publishReaction(
         targetEventId: String,
         targetPubkey: String,
         content: String = "+",
         relayUrl: String? = null
-    ) {
-        withContext(Dispatchers.IO) {
-            try {
-                // Get user's pubkey
-                val userPubkey = KeyStoreManager.getPubkeyHex()
-                    ?: throw Exception("No pubkey available")
-                
-                println("🎯 InteractionPublisher.publishReaction: userPubkey=${userPubkey.take(8)}..., targetEvent=${targetEventId.take(8)}...")
-                
-                val reactionEvent = InteractionController.createReactionEvent(
-                    targetEventId = targetEventId,
-                    targetPubkey = targetPubkey,
-                    content = content,
-                    userPubkey = userPubkey,
-                    relayUrl = relayUrl
-                )
-                
-                println("📝 Created reaction event with pubkey=${reactionEvent.pubkey.take(8)}...")
-                
-                signAndPublish(reactionEvent.toJson().toString())
-            } catch (e: Exception) {
-                println("❌ InteractionPublisher: Failed to publish reaction: ${e.message}")
-                throw e
-            }
-        }
-    }
-    
-    /**
-     * Sign and publish a reply event
-     */
+    )
+
     suspend fun publishReply(
         content: String,
         replyToEventId: String,
         replyToPubkey: String,
         relayUrl: String? = null
-    ) {
-        withContext(Dispatchers.IO) {
-            try {
-                // Get user's pubkey
-                val userPubkey = KeyStoreManager.getPubkeyHex()
-                    ?: throw Exception("No pubkey available")
-                
-                println("🎯 InteractionPublisher.publishReply: userPubkey=${userPubkey.take(8)}..., replyToEvent=${replyToEventId.take(8)}...")
-                
-                val replyEvent = InteractionController.createReplyEvent(
-                    content = content,
-                    replyToEventId = replyToEventId,
-                    replyToPubkey = replyToPubkey,
-                    userPubkey = userPubkey,
-                    relayUrl = relayUrl
-                )
-                
-                println("📝 Created reply event with pubkey=${replyEvent.pubkey.take(8)}...")
-                
-                signAndPublish(replyEvent.toJson().toString())
-            } catch (e: Exception) {
-                println("❌ InteractionPublisher: Failed to publish reply: ${e.message}")
-                throw e
-            }
-        }
-    }
-    
-    /**
-     * Sign and publish a repost event
-     */
+    )
+
     suspend fun publishRepost(
         targetEventId: String,
         targetPubkey: String,
         originalEventJson: String? = null,
         relayUrl: String? = null
+    )
+}
+
+class DefaultInteractionPublisher : InteractionPublisher {
+    override suspend fun publishReaction(
+        targetEventId: String,
+        targetPubkey: String,
+        content: String,
+        relayUrl: String?
     ) {
         withContext(Dispatchers.IO) {
-            try {
-                // Get user's pubkey
-                val userPubkey = KeyStoreManager.getPubkeyHex()
-                    ?: throw Exception("No pubkey available")
-                
-                println("🎯 InteractionPublisher.publishRepost: userPubkey=${userPubkey.take(8)}..., targetEvent=${targetEventId.take(8)}...")
-                
-                val repostEvent = InteractionController.createRepostEvent(
-                    targetEventId = targetEventId,
-                    targetPubkey = targetPubkey,
-                    userPubkey = userPubkey,
-                    originalEventJson = originalEventJson,
-                    relayUrl = relayUrl
-                )
-                
-                println("📝 Created repost event with pubkey=${repostEvent.pubkey.take(8)}...")
-                
-                signAndPublish(repostEvent.toJson().toString())
-            } catch (e: Exception) {
-                println("❌ InteractionPublisher: Failed to publish repost: ${e.message}")
-                throw e
-            }
+            val userPubkey = KeyStoreManager.getPubkeyHex()
+                ?: throw Exception("No pubkey available")
+
+            SecureLog.d(
+                "InteractionPublisher: Creating reaction for ${SecureLog.truncateHex(targetEventId)} " +
+                    "as ${SecureLog.truncateHex(userPubkey)}"
+            )
+
+            val reactionEvent = InteractionController.createReactionEvent(
+                targetEventId = targetEventId,
+                targetPubkey = targetPubkey,
+                content = content,
+                userPubkey = userPubkey,
+                relayUrl = relayUrl
+            )
+
+            signAndPublish(reactionEvent.toJson().toString())
         }
     }
-    
-    /**
-     * Generic sign and publish for unsigned event JSON string
-     * Handles both Amber and nsec signing
-     */
-    private suspend fun signAndPublish(unsignedEventJsonStr: String) {
-        try {
-            val unsignedEventJson = JSONObject(unsignedEventJsonStr)
-            val eventId = NostrEventSigner.calculateEventId(unsignedEventJsonStr)
-            val userPubkey = unsignedEventJson.optString("pubkey")
-            
-            if (userPubkey.isBlank()) {
-                throw Exception("Event missing pubkey field")
-            }
-            
-            println("📝 InteractionPublisher.signAndPublish: eventPubkey=${userPubkey.take(8)}..., Kind: ${unsignedEventJson.optInt("kind")}, ID: ${eventId.take(8)}...")
-            
-            val isUsingAmber = KeyStoreManager.isUsingAmber()
-            println("🔑 Signing method: ${if (isUsingAmber) "Amber" else "nsec"}")
-            
-            if (isUsingAmber) {
-                // Sign with Amber (NIP-55)
-                try {
-                    // Verify configured pubkey matches event pubkey
-                    val configuredPubkey = AmberSignerManager.getConfiguredPubkey()
-                    println("🔍 Amber configured pubkey: ${configuredPubkey?.take(8)}..., Event pubkey: ${userPubkey.take(8)}...")
-                    if (configuredPubkey != userPubkey) {
-                        println("⚠️ WARNING: Pubkey mismatch! Configured: ${configuredPubkey?.take(8)}, Event: ${userPubkey.take(8)}")
-                    }
-                    
-                    // Add ID to event for Amber
-                    unsignedEventJson.put("id", eventId)
-                    
-                    val signResult = AmberSignerManager.signEvent(
-                        eventJson = unsignedEventJson.toString(),
-                        eventId = eventId,
-                        timeoutMs = 30_000
-                    )
-                    
-                    // Parse the result - Amber returns the signature directly as hex string (not JSON)
-                    if (!signResult.result.isNullOrBlank()) {
-                        val signature = signResult.result  // Direct hex string from Amber
-                        
-                        if (signature.isNotBlank()) {
-                            println("✅ InteractionPublisher: Signed with Amber - Sig: ${signature.take(20)}")
-                            
-                            // Build signed event JSON string using the modified unsignedEventJson that has the ID
-                            val signedJson = unsignedEventJson.apply {
-                                put("sig", signature)
-                            }
-                            
-                            println("📤 Publishing event to relays: pubkey=${signedJson.optString("pubkey").take(8)}..., id=${signedJson.optString("id").take(8)}...")
-                            
-                            // Publish to relays as JSON event
-                            val eventMessage = """["EVENT",${signedJson}]"""
-                            NostrRepository.publishEvent(eventMessage)
-                            println("📤 InteractionPublisher: Published event to relays via Amber")
-                        } else {
-                            println("⚠️ InteractionPublisher: Amber returned empty signature")
-                            throw Exception("Empty signature from Amber")
-                        }
-                    } else {
-                        println("⚠️ InteractionPublisher: Amber returned empty result")
-                        throw Exception("Empty result from Amber")
-                    }
-                } catch (amberError: Exception) {
-                    println("⚠️ InteractionPublisher: Amber signing failed: ${amberError.message}")
-                    throw amberError
-                }
-            } else {
-                // Sign with local nsec
-                try {
-                    val privKeyHex = KeyStoreManager.exportNsecHex()
-                        ?: throw Exception("No private key available")
-                    
-                    val privKeyBytes = privKeyHex.hexToBytes()
-                    
-                    // Extract event fields
-                    val kind = unsignedEventJson.optInt("kind")
-                    val content = unsignedEventJson.optString("content", "")
-                    val tagsJson = unsignedEventJson.optJSONArray("tags")
-                    val tags = if (tagsJson != null) {
-                        (0 until tagsJson.length()).map { i ->
-                            val tagArr = tagsJson.getJSONArray(i)
-                            (0 until tagArr.length()).map { j ->
-                                tagArr.getString(j)
-                            }
-                        }
-                    } else {
-                        emptyList()
-                    }
-                    
-                    // Sign with nsec
-                    val signedEventJson = NostrEventSigner.signEvent(
-                        kind = kind,
-                        content = content,
-                        tags = tags,
-                        pubkeyHex = userPubkey,
-                        privKeyBytes = privKeyBytes
-                    )
-                    
-                    println("✅ InteractionPublisher: Signed with nsec")
-                    
-                    // Publish to relays
-                    val eventMessage = """["EVENT",$signedEventJson]"""
-                    NostrRepository.publishEvent(eventMessage)
-                    println("📤 InteractionPublisher: Published event to relays via nsec")
-                } catch (nsecError: Exception) {
-                    println("⚠️ InteractionPublisher: nsec signing failed: ${nsecError.message}")
-                    throw nsecError
-                }
-            }
-        } catch (e: Exception) {
-            println("❌ InteractionPublisher: Error signing/publishing event: ${e.message}")
-            throw e
+
+    override suspend fun publishReply(
+        content: String,
+        replyToEventId: String,
+        replyToPubkey: String,
+        relayUrl: String?
+    ) {
+        withContext(Dispatchers.IO) {
+            val userPubkey = KeyStoreManager.getPubkeyHex()
+                ?: throw Exception("No pubkey available")
+
+            SecureLog.d(
+                "InteractionPublisher: Creating reply for ${SecureLog.truncateHex(replyToEventId)} " +
+                    "as ${SecureLog.truncateHex(userPubkey)}"
+            )
+
+            val replyEvent = InteractionController.createReplyEvent(
+                content = content,
+                replyToEventId = replyToEventId,
+                replyToPubkey = replyToPubkey,
+                userPubkey = userPubkey,
+                relayUrl = relayUrl
+            )
+
+            signAndPublish(replyEvent.toJson().toString())
         }
+    }
+
+    override suspend fun publishRepost(
+        targetEventId: String,
+        targetPubkey: String,
+        originalEventJson: String?,
+        relayUrl: String?
+    ) {
+        withContext(Dispatchers.IO) {
+            val userPubkey = KeyStoreManager.getPubkeyHex()
+                ?: throw Exception("No pubkey available")
+
+            SecureLog.d(
+                "InteractionPublisher: Creating repost for ${SecureLog.truncateHex(targetEventId)} " +
+                    "as ${SecureLog.truncateHex(userPubkey)}"
+            )
+
+            val repostEvent = InteractionController.createRepostEvent(
+                targetEventId = targetEventId,
+                targetPubkey = targetPubkey,
+                userPubkey = userPubkey,
+                originalEventJson = originalEventJson,
+                relayUrl = relayUrl
+            )
+
+            signAndPublish(repostEvent.toJson().toString())
+        }
+    }
+
+    private suspend fun signAndPublish(unsignedEventJsonStr: String) {
+        val unsignedEventJson = JSONObject(unsignedEventJsonStr)
+        val eventId = NostrEventSigner.calculateEventId(unsignedEventJsonStr)
+        val userPubkey = unsignedEventJson.optString("pubkey")
+
+        if (userPubkey.isBlank()) {
+            throw Exception("Event missing pubkey field")
+        }
+
+        val isUsingAmber = KeyStoreManager.isUsingAmber()
+        SecureLog.d(
+            "InteractionPublisher: Signing event ${SecureLog.truncateHex(eventId)} " +
+                "using ${if (isUsingAmber) "Amber" else "local key"}"
+        )
+
+        if (isUsingAmber) {
+            signAndPublishWithAmber(unsignedEventJson, eventId, userPubkey)
+        } else {
+            signAndPublishWithLocalKey(unsignedEventJson, userPubkey)
+        }
+    }
+
+    private suspend fun signAndPublishWithAmber(
+        unsignedEventJson: JSONObject,
+        eventId: String,
+        userPubkey: String
+    ) {
+        val configuredPubkey = AmberSignerManager.getConfiguredPubkey()
+        if (configuredPubkey != null && configuredPubkey != userPubkey) {
+            SecureLog.w(
+                "InteractionPublisher: Amber pubkey mismatch configured=${SecureLog.truncateHex(configuredPubkey)} " +
+                    "event=${SecureLog.truncateHex(userPubkey)}"
+            )
+        }
+
+        unsignedEventJson.put("id", eventId)
+        val signResult = AmberSignerManager.signEvent(
+            eventJson = unsignedEventJson.toString(),
+            eventId = eventId,
+            timeoutMs = 30_000
+        )
+
+        val signature = signResult.result
+        if (signature.isNullOrBlank()) {
+            throw Exception("Empty result from Amber")
+        }
+
+        val signedJson = unsignedEventJson.apply {
+            put("sig", signature)
+        }
+
+        SecureLog.d("InteractionPublisher: Publishing Amber-signed interaction ${SecureLog.truncateHex(eventId)}")
+        NostrRepository.publishEvent("""["EVENT",${signedJson}]""")
+    }
+
+    private fun signAndPublishWithLocalKey(
+        unsignedEventJson: JSONObject,
+        userPubkey: String
+    ) {
+        val privKeyHex = KeyStoreManager.exportNsecHex()
+            ?: throw Exception("No private key available")
+
+        val privKeyBytes = privKeyHex.hexToBytes()
+        val kind = unsignedEventJson.optInt("kind")
+        val content = unsignedEventJson.optString("content", "")
+        val tagsJson = unsignedEventJson.optJSONArray("tags")
+        val tags = if (tagsJson != null) {
+            (0 until tagsJson.length()).map { i ->
+                val tagArr = tagsJson.getJSONArray(i)
+                (0 until tagArr.length()).map { j ->
+                    tagArr.getString(j)
+                }
+            }
+        } else {
+            emptyList()
+        }
+
+        val signedEventJson = NostrEventSigner.signEvent(
+            kind = kind,
+            content = content,
+            tags = tags,
+            pubkeyHex = userPubkey,
+            privKeyBytes = privKeyBytes
+        )
+
+        SecureLog.d("InteractionPublisher: Publishing local-key interaction")
+        NostrRepository.publishEvent("""["EVENT",$signedEventJson]""")
     }
 }
 
-// Helper extension to convert hex string to bytes
 private fun String.hexToBytes(): ByteArray {
     val clean = this.trim().removePrefix("0x")
     val out = ByteArray(clean.length / 2)

@@ -1,5 +1,6 @@
 package com.memely.nostr
 
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
@@ -39,11 +40,11 @@ object NostrRepository {
         // Use a Mutex to prevent concurrent connectAll executions which could double-connect
         connectMutex.withLock {
             if (currentRelays.sorted() == lastConnectedRelays.sorted()) {
-                println("NostrRepository: Already connected to these relays, skipping")
+                SecureLog.d("NostrRepository: Relays unchanged, skipping reconnect")
                 return@withLock
             }
 
-            println("NostrRepository: Connecting to ${currentRelays.size} relays: ${currentRelays.take(3)}...")
+            SecureLog.d("NostrRepository: Connecting to ${currentRelays.size} relays")
             relayPool.updateRelays(currentRelays)
             lastConnectedRelays = currentRelays
             isInitialConnectionDone = true
@@ -477,46 +478,50 @@ object NostrRepository {
         refreshProfile(pubkey)
     }
     
-    /**
-     * Subscribe to interactions (replies, reactions, reposts) for an event
-     * Fetches kind 1 (replies), kind 7 (reactions), and kind 6 (reposts)
-     */
-    fun subscribeToReplies(eventId: String, subscriptionId: String = "interactions-${eventId.take(8)}", onMessage: (String) -> Unit) {
-        val subId = subscriptionId
-        
-        // Create a subscription for all interaction kinds
-        // Kind 1: replies with e-tag matching eventId
-        // Kind 7: reactions with e-tag matching eventId
-        // Kind 6: reposts with e-tag matching eventId
-        val req = """["REQ","$subId",{"kinds":[1,6,7],"#e":["$eventId"],"limit":100}]"""
-        
+    fun interactionEvents(
+        eventId: String,
+        subscriptionId: String = "interactions-${eventId.take(8)}-${System.currentTimeMillis()}",
+        limit: Int = 100
+    ): Flow<String> = callbackFlow {
+        val req = """["REQ","$subscriptionId",{"kinds":[1,6,7],"#e":["$eventId"],"limit":$limit}]"""
         relayPool.broadcast(req)
-        
-        
-        // Listen for messages
-        scope.launch {
+
+        val listenerJob = scope.launch {
             incomingMessagesFlow.collect { message ->
                 try {
                     val json = JSONArray(message)
                     val msgType = json.optString(0, "")
                     val msgSubId = json.optString(1, "")
-                    
-                    if (msgType == "EVENT" && msgSubId == subId) {
-                        val eventJson = json.optJSONObject(2)
-                        if (eventJson != null) {
-                            onMessage(eventJson.toString())
+
+                    if (msgSubId != subscriptionId) {
+                        return@collect
+                    }
+
+                    when (msgType) {
+                        "EVENT" -> {
+                            val eventJson = json.optJSONObject(2)
+                            if (eventJson != null) {
+                                trySend(eventJson.toString())
+                            }
+                        }
+                        "EOSE", "CLOSED" -> {
+                            close()
+                            cancel("Interaction subscription completed: $subscriptionId")
                         }
                     }
-                } catch (e: Exception) {
-                    
+                } catch (_: Exception) {
                 }
             }
         }
+
+        awaitClose {
+            listenerJob.cancel()
+            closeSubscription(subscriptionId)
+        }
     }
-    
+
     fun closeSubscription(subscriptionId: String) {
         val req = """["CLOSE","$subscriptionId"]"""
         relayPool.broadcast(req)
-        
     }
 }

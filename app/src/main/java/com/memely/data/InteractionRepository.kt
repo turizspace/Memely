@@ -2,24 +2,29 @@ package com.memely.data
 
 import com.memely.nostr.MemeNote
 import com.memely.nostr.NostrRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import com.memely.util.SecureLog
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
+import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Repository for fetching replies, reactions, and reposts for a given event
+ * Repository for fetching replies, reactions, and reposts for a given event.
+ * Exposes a per-event StateFlow and uses structured relay subscriptions
+ * instead of callback mutation plus busy-wait polling.
  */
-object InteractionRepository {
-    
-    // Cache for interaction counts: Map<eventId, InteractionCounts>
-    private val interactionCounts = mutableMapOf<String, InteractionCounts>()
-    // Track active subscriptions so we can close them
-    private val activeSubscriptions = mutableSetOf<String>()
-    
+class InteractionRepository(
+    private val appScope: CoroutineScope,
+    private val fetchTimeoutMs: Long = 3_000L
+) {
     data class InteractionCounts(
         val eventId: String,
         val replyCount: Int = 0,
@@ -29,114 +34,164 @@ object InteractionRepository {
         val repostCount: Int = 0,
         val replies: List<MemeNote> = emptyList()
     )
-    
-    /**
-     * Fetch interaction counts and replies for an event
-     * Waits briefly for subscription events before returning to ensure data is loaded
-     */
-    suspend fun fetchInteractions(eventId: String): InteractionCounts? {
-        return withContext(Dispatchers.IO) {
-            try {
-                // Check cache first
-                interactionCounts[eventId]?.let { 
-                    println("💾 InteractionRepository: Using cached interactions for $eventId")
-                    return@withContext it
-                }
-                
-                val subscriptionId = "interactions-${eventId.take(8)}-${System.currentTimeMillis()}"
-                
-                // Use Sets to deduplicate by event ID (same event from multiple relays)
-                val repliesById = mutableMapOf<String, MemeNote>()
-                val reactionsById = mutableSetOf<String>()
-                val repostsById = mutableSetOf<String>()
-                val emojiReactions = mutableMapOf<String, Int>()
-                
-                // Subscribe to get replies (kind 1 with e-tag matching eventId)
-                NostrRepository.subscribeToReplies(eventId, subscriptionId) { event ->
-                    try {
-                        val json = org.json.JSONObject(event)
-                        val kind = json.optInt("kind", 0)
-                        val noteId = json.optString("id", "")
-                        
-                        // Skip if we've already seen this event ID
-                        if (noteId.isBlank()) return@subscribeToReplies
-                        
-                        when (kind) {
-                            1 -> {
-                                // Reply (kind 1) - verify it's actually replying to this eventId
-                                val tags = json.optJSONArray("tags") ?: org.json.JSONArray()
-                                var isReplyToThisEvent = false
-                                for (i in 0 until tags.length()) {
-                                    val tag = tags.optJSONArray(i)
-                                    if (tag?.optString(0) == "e" && tag.optString(1) == eventId) {
-                                        isReplyToThisEvent = true
-                                        break
-                                    }
-                                }
-                                if (isReplyToThisEvent && !repliesById.containsKey(noteId)) {
-                                    repliesById[noteId] = parseMemeNoteFromJson(json)
-                                    println("📝 InteractionRepository: Added reply ${noteId.take(8)} from ${json.optString("pubkey").take(8)}")
-                                }
-                            }
-                            7 -> {
-                                // Reaction (kind 7) - deduplicate by event ID
-                                if (!reactionsById.contains(noteId)) {
-                                    reactionsById.add(noteId)
-                                    val content = json.optString("content", "+")
-                                    emojiReactions[content] = (emojiReactions[content] ?: 0) + 1
-                                }
-                            }
-                            6 -> {
-                                // Repost (kind 6) - deduplicate by event ID
-                                if (!repostsById.contains(noteId)) {
-                                    repostsById.add(noteId)
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        println("❌ InteractionRepository: Error parsing interaction event: ${e.message}")
-                    }
-                }
-                
-                // Wait for subscription to receive events (3 second timeout)
-                println("⏳ InteractionRepository: Waiting for subscription events for $eventId...")
-                for (i in 0..30) { // 3 seconds with 100ms checks
-                    delay(100)
-                }
-                
-                // Close subscription after we're done
-                NostrRepository.closeSubscription(subscriptionId)
-                activeSubscriptions.remove(subscriptionId)
-                println("🔚 InteractionRepository: Closed subscription $subscriptionId")
-                
-                // Calculate counts from deduplicated data
-                val replies = repliesById.values.toList()
-                val likeCount = emojiReactions["+"] ?: 0
-                val dislikeCount = emojiReactions["-"] ?: 0
-                val repostCount = repostsById.size
-                
-                val counts = InteractionCounts(
-                    eventId = eventId,
-                    replyCount = replies.size,
-                    likeCount = likeCount,
-                    dislikeCount = dislikeCount,
-                    emojiReactions = emojiReactions,
-                    repostCount = repostCount,
-                    replies = replies
+
+    data class InteractionUiState(
+        val counts: InteractionCounts? = null,
+        val isLoading: Boolean = false,
+        val error: String? = null
+    )
+
+    private val cachedCounts = ConcurrentHashMap<String, InteractionCounts>()
+    private val interactionStates = ConcurrentHashMap<String, MutableStateFlow<InteractionUiState>>()
+    private val refreshMutexes = ConcurrentHashMap<String, Mutex>()
+
+    fun observeInteractions(eventId: String): StateFlow<InteractionUiState> {
+        return interactionStates.getOrPut(eventId) {
+            MutableStateFlow(
+                InteractionUiState(
+                    counts = cachedCounts[eventId],
+                    isLoading = cachedCounts[eventId] == null
                 )
-                
-                // Cache the results
-                interactionCounts[eventId] = counts
-                println("✅ InteractionRepository: Fetched interactions for $eventId - ${replies.size} replies, $likeCount likes, $repostCount reposts (deduplicated)")
-                
-                counts
-            } catch (e: Exception) {
-                println("❌ InteractionRepository: Failed to fetch interactions: ${e.message}")
-                null
+            )
+        }.asStateFlow()
+    }
+
+    suspend fun fetchInteractions(eventId: String): InteractionCounts? {
+        refreshInteractions(eventId)
+        return cachedCounts[eventId]
+    }
+
+    suspend fun refreshInteractions(eventId: String, forceRefresh: Boolean = false) {
+        val state = interactionStates.getOrPut(eventId) {
+            MutableStateFlow(InteractionUiState())
+        }
+        val mutex = refreshMutexes.getOrPut(eventId) { Mutex() }
+
+        mutex.withLock {
+            val cached = cachedCounts[eventId]
+            if (cached != null && !forceRefresh) {
+                state.value = InteractionUiState(counts = cached)
+                SecureLog.d("InteractionRepository: Using cached interactions for ${SecureLog.truncateHex(eventId)}")
+                return
+            }
+
+            state.value = state.value.copy(isLoading = true, error = null)
+
+            runCatching {
+                fetchFromRelays(eventId)
+            }.onSuccess { counts ->
+                cachedCounts[eventId] = counts
+                state.value = InteractionUiState(counts = counts)
+                SecureLog.d(
+                    "InteractionRepository: Loaded interactions for ${SecureLog.truncateHex(eventId)} " +
+                        "replies=${counts.replyCount} likes=${counts.likeCount} reposts=${counts.repostCount}"
+                )
+            }.onFailure { throwable ->
+                state.value = state.value.copy(
+                    isLoading = false,
+                    error = "Failed to fetch interactions: ${throwable.message}"
+                )
+                SecureLog.e("InteractionRepository: Failed to fetch interactions for ${SecureLog.truncateHex(eventId)}", throwable)
             }
         }
     }
-    
+
+    fun invalidateCache(eventId: String) {
+        cachedCounts.remove(eventId)
+        interactionStates[eventId]?.value = interactionStates[eventId]?.value?.copy(error = null)
+            ?: InteractionUiState()
+        SecureLog.d("InteractionRepository: Invalidated cache for ${SecureLog.truncateHex(eventId)}")
+
+        if (interactionStates.containsKey(eventId)) {
+            appScope.launch {
+                refreshInteractions(eventId, forceRefresh = true)
+            }
+        }
+    }
+
+    fun getCachedInteractions(eventId: String): InteractionCounts? = cachedCounts[eventId]
+
+    private suspend fun fetchFromRelays(eventId: String): InteractionCounts {
+        val repliesById = linkedMapOf<String, MemeNote>()
+        val reactionsById = mutableSetOf<String>()
+        val repostsById = mutableSetOf<String>()
+        val emojiReactions = mutableMapOf<String, Int>()
+
+        withTimeoutOrNull(fetchTimeoutMs) {
+            NostrRepository.interactionEvents(eventId).collect { eventJson ->
+                processInteractionEvent(
+                    eventId = eventId,
+                    eventJson = eventJson,
+                    repliesById = repliesById,
+                    reactionsById = reactionsById,
+                    repostsById = repostsById,
+                    emojiReactions = emojiReactions
+                )
+            }
+        }
+
+        val replies = repliesById.values.sortedBy { it.createdAt }
+        return InteractionCounts(
+            eventId = eventId,
+            replyCount = replies.size,
+            likeCount = emojiReactions["+"] ?: 0,
+            dislikeCount = emojiReactions["-"] ?: 0,
+            emojiReactions = emojiReactions.toMap(),
+            repostCount = repostsById.size,
+            replies = replies
+        )
+    }
+
+    private fun processInteractionEvent(
+        eventId: String,
+        eventJson: String,
+        repliesById: MutableMap<String, MemeNote>,
+        reactionsById: MutableSet<String>,
+        repostsById: MutableSet<String>,
+        emojiReactions: MutableMap<String, Int>
+    ) {
+        try {
+            val json = JSONObject(eventJson)
+            val kind = json.optInt("kind", 0)
+            val noteId = json.optString("id", "")
+            if (noteId.isBlank()) {
+                return
+            }
+
+            when (kind) {
+                1 -> {
+                    if (isReplyToEvent(json.optJSONArray("tags"), eventId) && repliesById.putIfAbsent(noteId, parseMemeNoteFromJson(json)) == null) {
+                        SecureLog.d("InteractionRepository: Added reply ${SecureLog.truncateHex(noteId)}")
+                    }
+                }
+                7 -> {
+                    if (reactionsById.add(noteId)) {
+                        val content = json.optString("content", "+")
+                        emojiReactions[content] = (emojiReactions[content] ?: 0) + 1
+                    }
+                }
+                6 -> repostsById.add(noteId)
+            }
+        } catch (e: Exception) {
+            SecureLog.e("InteractionRepository: Error parsing interaction event", e)
+        }
+    }
+
+    private fun isReplyToEvent(tags: JSONArray?, eventId: String): Boolean {
+        if (tags == null) {
+            return false
+        }
+
+        for (i in 0 until tags.length()) {
+            val tag = tags.optJSONArray(i) ?: continue
+            if (tag.optString(0) == "e" && tag.optString(1) == eventId) {
+                return true
+            }
+        }
+
+        return false
+    }
+
     private fun parseMemeNoteFromJson(json: JSONObject): MemeNote {
         val tagsArray = json.optJSONArray("tags") ?: JSONArray()
         val tags = mutableListOf<List<String>>()
@@ -150,7 +205,7 @@ object InteractionRepository {
             }
             tags.add(tag)
         }
-        
+
         return MemeNote(
             id = json.optString("id", ""),
             pubkey = json.optString("pubkey", ""),
@@ -158,20 +213,5 @@ object InteractionRepository {
             createdAt = json.optLong("created_at", 0),
             tags = tags
         )
-    }
-    
-    /**
-     * Clear cache for an event (useful after user posts new reaction/reply)
-     */
-    fun invalidateCache(eventId: String) {
-        interactionCounts.remove(eventId)
-        println("🔄 InteractionRepository: Invalidated cache for $eventId")
-    }
-    
-    /**
-     * Get cached interaction counts without refetching
-     */
-    fun getCachedInteractions(eventId: String): InteractionCounts? {
-        return interactionCounts[eventId]
     }
 }

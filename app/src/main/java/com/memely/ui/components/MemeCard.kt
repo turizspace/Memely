@@ -23,29 +23,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
-import com.memely.nostr.MemeNote
+import com.memely.di.appContainer
 import com.memely.nostr.MetadataParser
-import com.memely.nostr.UserMetadataCache
-import com.memely.nostr.NostrRepository
-import com.memely.data.InteractionRepository
-import com.memely.nostr.InteractionController
-import com.memely.nostr.InteractionPublisher
 import com.memely.nostr.AmberSignerManager
-import org.json.JSONObject
-import org.json.JSONArray
+import com.memely.nostr.MemeNote
+import com.memely.nostr.NostrRepository
+import com.memely.nostr.UserMetadataCache
+import com.memely.util.SecureLog
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 @Composable
 fun MemeCard(
     memeNote: MemeNote,
     modifier: Modifier = Modifier
 ) {
-    // Debug the incoming note
-    println("🎨 MemeCard: Rendering note from ${memeNote.pubkey.take(8)} - ID: ${memeNote.id.take(8)}")
-    
+    val context = LocalContext.current
+    val appContainer = remember(context) { context.appContainer }
+    val interactionRepository = appContainer.interactionRepository
+    val interactionPublisher = appContainer.interactionPublisher
     val scope = rememberCoroutineScope()
     
     // Interaction dialogs state
@@ -70,7 +71,7 @@ fun MemeCard(
             val newMetadata = cacheUpdate?.second
             if (newMetadata != null) {
                 userMetadata = newMetadata
-                println("🔔 MemeCard: Cache updated for ${memeNote.pubkey.take(8)} - ${newMetadata.name}")
+                SecureLog.d("MemeCard: Cache updated for ${SecureLog.truncateHex(memeNote.pubkey)}")
             }
         }
     }
@@ -79,19 +80,18 @@ fun MemeCard(
     LaunchedEffect(memeNote.pubkey) {
         val cachedNow = UserMetadataCache.getCachedMetadata(memeNote.pubkey)
         if (cachedNow == null) {
-            println("🔄 MemeCard: Fetching metadata synchronously for ${memeNote.pubkey.take(8)}...")
+            SecureLog.d("MemeCard: Fetching metadata for ${SecureLog.truncateHex(memeNote.pubkey)}")
             try {
-                // Fetch directly instead of background - ensures card sees the result
                 val fetchedMetadata = NostrRepository.fetchProfileMetadata(memeNote.pubkey)
                 if (fetchedMetadata != null) {
                     userMetadata = fetchedMetadata
-                    println("✅ MemeCard: Fetched metadata for ${memeNote.pubkey.take(8)} - ${fetchedMetadata.name}")
+                    SecureLog.d("MemeCard: Loaded metadata for ${SecureLog.truncateHex(memeNote.pubkey)}")
                 }
             } catch (e: Exception) {
-                println("❌ MemeCard: Failed to fetch metadata: ${e.message}")
+                SecureLog.e("MemeCard: Failed to fetch metadata", e)
             }
         } else {
-            println("💾 MemeCard: Using cached metadata for ${memeNote.pubkey.take(8)} - ${cachedNow.name}")
+            SecureLog.d("MemeCard: Using cached metadata for ${SecureLog.truncateHex(memeNote.pubkey)}")
             userMetadata = cachedNow
         }
     }
@@ -175,8 +175,6 @@ fun MemeCard(
             // Meme image - with safe aspect ratio handling
             val imageUrl = extractImageUrl(memeNote.content)
             if (!imageUrl.isNullOrBlank()) {
-                println("🖼️ MemeCard: Displaying image from $imageUrl")
-                
                 val painter = rememberAsyncImagePainter(
                     model = imageUrl
                 )
@@ -232,16 +230,14 @@ fun MemeCard(
                     scope.launch {
                         try {
                             isPublishingReaction = true
-                            println("❤️ MemeCard: Publishing reaction: $emoji")
-                            InteractionPublisher.publishReaction(
+                            interactionPublisher.publishReaction(
                                 targetEventId = memeNote.id,
                                 targetPubkey = memeNote.pubkey,
                                 content = emoji
                             )
-                            println("✅ MemeCard: Reaction published successfully")
-                            InteractionRepository.invalidateCache(memeNote.id)
+                            interactionRepository.invalidateCache(memeNote.id)
                         } catch (e: Exception) {
-                            println("❌ MemeCard: Failed to publish reaction: ${e.message}")
+                            SecureLog.e("MemeCard: Failed to publish reaction", e)
                         } finally {
                             isPublishingReaction = false
                         }
@@ -252,16 +248,14 @@ fun MemeCard(
                     scope.launch {
                         try {
                             isPublishingRepost = true
-                            println("🔄 MemeCard: Publishing repost")
-                            InteractionPublisher.publishRepost(
+                            interactionPublisher.publishRepost(
                                 targetEventId = memeNote.id,
                                 targetPubkey = memeNote.pubkey,
                                 originalEventJson = memeNote.toJson()
                             )
-                            println("✅ MemeCard: Repost published successfully")
-                            InteractionRepository.invalidateCache(memeNote.id)
+                            interactionRepository.invalidateCache(memeNote.id)
                         } catch (e: Exception) {
-                            println("❌ MemeCard: Failed to publish repost: ${e.message}")
+                            SecureLog.e("MemeCard: Failed to publish repost", e)
                         } finally {
                             isPublishingRepost = false
                         }
@@ -279,23 +273,15 @@ fun MemeCard(
                 scope.launch {
                     try {
                         isSubmittingReply = true
-                        println("💬 MemeCard: Submitting reply: $replyText")
-                        
-                        // Publish reply to Nostr
-                        InteractionPublisher.publishReply(
+                        interactionPublisher.publishReply(
                             content = replyText,
                             replyToEventId = memeNote.id,
                             replyToPubkey = memeNote.pubkey
                         )
-                        
-                        println("✅ MemeCard: Reply published successfully")
-                        
-                        // Close dialog and refresh interactions
                         showReplyDialog = false
-                        InteractionRepository.invalidateCache(memeNote.id)
+                        interactionRepository.invalidateCache(memeNote.id)
                     } catch (e: Exception) {
-                        println("❌ MemeCard: Failed to publish reply: ${e.message}")
-                        // Keep dialog open on error so user can retry
+                        SecureLog.e("MemeCard: Failed to publish reply", e)
                     } finally {
                         isSubmittingReply = false
                     }

@@ -5,22 +5,24 @@ import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Reply
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.memely.data.InteractionRepository
+import com.memely.di.appContainer
 import com.memely.ui.tutorial.tutorialTarget
 
 @Composable
@@ -33,22 +35,17 @@ fun InteractionControlsBox(
     onRepostClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val interactions = remember { mutableStateOf<InteractionRepository.InteractionCounts?>(null) }
-    val userLiked = remember { mutableStateOf(false) }
-    val userReposted = remember { mutableStateOf(false) }
-    
-    // Fetch interaction counts on composition
+    val context = LocalContext.current
+    val interactionRepository = remember(context) { context.appContainer.interactionRepository }
+    val interactionState by interactionRepository.observeInteractions(eventId).collectAsState()
+    val userLiked = remember(eventId) { mutableStateOf(false) }
+    val userReposted = remember(eventId) { mutableStateOf(false) }
+
     LaunchedEffect(eventId) {
-        try {
-            val counts = InteractionRepository.fetchInteractions(eventId)
-            interactions.value = counts
-            println("🎯 InteractionControlsBox: Loaded interactions for $eventId")
-        } catch (e: Exception) {
-            println("❌ InteractionControlsBox: Failed to fetch interactions: ${e.message}")
-        }
+        interactionRepository.refreshInteractions(eventId)
     }
-    
-    val counts = interactions.value
+
+    val counts = interactionState.counts
     
     Row(
         modifier = modifier
