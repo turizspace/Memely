@@ -127,6 +127,7 @@ class RelayPool(
 
     /**
      * Broadcast with retry logic - ensures message gets to all connected relays
+     * Optimized for poor connections with adaptive delays
      */
     suspend fun broadcastWithRetry(message: String, maxRetries: Int = 3) {
         val connectedCount = successful.get()
@@ -135,23 +136,28 @@ class RelayPool(
         }
         
         var attempt = 0
-        var successCount = 0
         var failedRelays = mutableListOf<NostrClient>()
         
         while (attempt < maxRetries && failedRelays.size < clients.size) {
             if (attempt > 0) {
-                delay(500)  // Wait before retry
+                // Adaptive delay: longer waits for poor connections
+                val delayMs = when {
+                    connectedCount <= 2 -> 1000L  // Very slow for poor connections
+                    connectedCount <= 4 -> 750L   // Slow for moderate connections
+                    else -> 500L                   // Normal delay for good connections
+                }
+                delay(delayMs)
             }
             
-            val toTry = if (attempt == 0) clients else failedRelays
+            val toTry = if (attempt == 0) clients.toList() else failedRelays.toList()
             failedRelays.clear()
             
             for (client in toTry) {
                 try {
+                    // Add per-relay delay for low bandwidth - avoid flooding
+                    delay(50)
                     val success = client.publish(message)
-                    if (success) {
-                        successCount++
-                    } else {
+                    if (!success) {
                         failedRelays.add(client)
                     }
                 } catch (e: Exception) {
@@ -161,6 +167,58 @@ class RelayPool(
             
             if (failedRelays.isEmpty()) break
             attempt++
+        }
+    }
+
+    /**
+     * Broadcast a message with per-relay response tracking
+     * Returns map of relay URL to success status
+     */
+    suspend fun broadcastWithTracking(message: String): Map<String, Boolean> {
+        val connectedCount = successful.get()
+        if (connectedCount == 0) {
+            return emptyMap()
+        }
+
+        val results = mutableMapOf<String, Boolean>()
+        
+        for (client in clients) {
+            try {
+                delay(50)  // Small delay for low bandwidth
+                val success = client.publish(message)
+                results[client.url] = success
+            } catch (e: Exception) {
+                results[client.url] = false
+            }
+        }
+        
+        return results
+    }
+
+    /**
+     * Broadcast with connection health awareness
+     * Prioritizes relays with better health scores
+     */
+    suspend fun broadcastAdaptive(message: String, healthScores: Map<String, Float> = emptyMap()) {
+        val connectedCount = successful.get()
+        if (connectedCount == 0) {
+            return
+        }
+
+        // Sort clients by health score (highest first)
+        val sortedClients = clients.toList().sortedByDescending { healthScores[it.url] ?: 0.5f }
+        
+        for ((index, client) in sortedClients.withIndex()) {
+            try {
+                // Progressive delay: faster for healthy relays, slower for unhealthy
+                val healthScore = healthScores[client.url] ?: 0.5f
+                val delayMs = (50 * (1.0 - healthScore)).toLong()
+                delay(delayMs)
+                
+                client.publish(message)
+            } catch (e: Exception) {
+                // Continue with next relay
+            }
         }
     }
 
