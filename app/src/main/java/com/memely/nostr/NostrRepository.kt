@@ -79,9 +79,9 @@ object NostrRepository {
                                     metadata = parsedMetadata
                                     hasRealMetadata = true
                                     _metadataState.value = parsedMetadata
-                                    // CRITICAL: Cache metadata immediately so it persists even if coroutines are cancelled
-                                    UserMetadataCache.cacheMetadata(pubkey, parsedMetadata)
-                                    SecureLog.d("NostrRepository: Found metadata: ${parsedMetadata.name}")
+                                    // CRITICAL: Cache metadata atomically only if newer (by created_at timestamp)
+                                    UserMetadataCache.cacheMetadataIfNewer(pubkey, parsedMetadata)
+                                    SecureLog.d("NostrRepository: Found metadata: ${parsedMetadata.name} (created_at: ${parsedMetadata.createdAt})")
                                 }
                             }
                             msg.contains("\"kind\":10002") && msg.contains(pubkey) -> {
@@ -151,9 +151,9 @@ object NostrRepository {
                             val parsedMetadata = parseMetadataFromMessage(msg, pubkey)
                             if (parsedMetadata != null) {
                                 metadata = parsedMetadata
-                                // CRITICAL: Cache metadata immediately so it persists even if coroutines are cancelled
-                                UserMetadataCache.cacheMetadata(pubkey, parsedMetadata)
-                                SecureLog.d("NostrRepository: Found metadata for ${pubkey.take(8)}: ${parsedMetadata.name}")
+                                // CRITICAL: Cache metadata atomically only if newer (by created_at timestamp)
+                                UserMetadataCache.cacheMetadataIfNewer(pubkey, parsedMetadata)
+                                SecureLog.d("NostrRepository: Found metadata for ${pubkey.take(8)}: ${parsedMetadata.name} (created_at: ${parsedMetadata.createdAt})")
                                 cancel() // Stop collection once we found the metadata
                             }
                         }
@@ -166,6 +166,24 @@ object NostrRepository {
             SecureLog.w("NostrRepository: Timeout waiting for metadata from ${pubkey.take(8)}")
         }
 
+        return metadata
+    }
+
+    suspend fun fetchSignedInUserMetadata(pubkey: String): MetadataParser.UserMetadata? {
+        val cached = UserMetadataCache.getCachedMetadata(pubkey)
+        if (cached != null && cached.name != "Anonymous" && cached.name != "Memely User") {
+            _metadataState.value = cached
+            hasRealMetadata = true
+            SecureLog.d("NostrRepository: Warmed signed-in user metadata from cache")
+            return cached
+        }
+
+        val metadata = fetchProfileMetadata(pubkey)
+        if (metadata != null && metadata.name != "Anonymous") {
+            _metadataState.value = metadata
+            hasRealMetadata = true
+            SecureLog.d("NostrRepository: Warmed signed-in user metadata from relays")
+        }
         return metadata
     }
 
@@ -311,11 +329,13 @@ object NostrRepository {
             val kind = eventObj.optInt("kind", -1)
             val eventPubkey = eventObj.optString("pubkey", "")
             val content = eventObj.optString("content", "{}")
+            val createdAt = eventObj.optLong("created_at", System.currentTimeMillis() / 1000) // Nostr uses Unix seconds
             
             if (kind == 0 && eventPubkey == targetPubkey) {
                 val parsed = MetadataParser.parseMetadata(content)
                 if (parsed != null) {
-                    return parsed
+                    // Include the Nostr event's created_at timestamp
+                    return parsed.copy(createdAt = createdAt)
                 }
             }
             null
@@ -374,6 +394,8 @@ object NostrRepository {
                         if (parsed != null) {
                             hasRealMetadata = true
                             _metadataState.value = parsed
+                            // Cache continuously received metadata atomically (only if newer)
+                            UserMetadataCache.cacheMetadataIfNewer(pubkey, parsed)
                         }
                     }
                 } catch (e: Exception) {
