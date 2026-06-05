@@ -334,6 +334,12 @@ fun AuthenticatedRoot(
     LaunchedEffect(connectedRelays, pubkeyHex) {
         authenticatedRootViewModel.refreshProfileIfNeeded(pubkeyHex, connectedRelays)
     }
+
+    LaunchedEffect(currentRoute, pubkeyHex) {
+        if (currentRoute == "profile") {
+            authenticatedRootViewModel.refreshSignedInUserMetadata(pubkeyHex)
+        }
+    }
     
     // Debug logging - improved
     LaunchedEffect(userMetadata) {
@@ -348,8 +354,7 @@ fun AuthenticatedRoot(
     Scaffold(
         topBar = {
             UserTopBar(
-                connectedRelays = connectedRelays,
-                totalRelays = totalRelays,
+                userMetadata = userMetadata,
                 onThemeChange = { newTheme ->
                     themeState = newTheme
                     com.memely.ui.theme.ThemeManager.saveThemePreference(context, newTheme)
