@@ -14,7 +14,8 @@ object MetadataParser {
         val nip05: String? = null,
         val lud16: String? = null,
         val banner: String? = null,
-        val website: String? = null // Added website field for completeness
+        val website: String? = null, // Added website field for completeness
+        val createdAt: Long = System.currentTimeMillis() // Timestamp of when this metadata was published (Nostr created_at)
     )
 
     /**
