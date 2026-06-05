@@ -1,8 +1,8 @@
 package com.memely.ui.components.editor
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,9 +16,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
@@ -68,19 +70,27 @@ fun ImageLayerBox(
 
     Box(
         modifier = modifier
-            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
             .size(width = width, height = height)
             .graphicsLayer(
                 rotationZ = rotation,
-                alpha = overlay.alpha
+                alpha = overlay.alpha,
+                scaleX = if (overlay.flipX) -1f else 1f,
+                scaleY = if (overlay.flipY) -1f else 1f,
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f) // Transform from top-left to match offset
             )
+            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
             .border(
                 width = if (overlay.selected) 2.dp else 0.dp,
-                color = if (overlay.selected) Color.Green else Color.Transparent,
+                color = if (overlay.selected) {
+                    if (overlay.locked) Color.Yellow else Color.Green
+                } else {
+                    Color.Transparent
+                },
                 shape = RoundedCornerShape(overlay.cornerRadius)
             )
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, rotationDelta ->
+                    if (overlay.locked) return@detectTransformGestures
                     offset += pan
                     scale = (scale * zoom).coerceIn(0.5f, 3f)
                     
@@ -108,5 +118,23 @@ fun ImageLayerBox(
                 ),
             contentScale = ContentScale.Crop
         )
+
+        if (overlay.selected) {
+            SelectionHandle(Modifier.align(Alignment.TopStart))
+            SelectionHandle(Modifier.align(Alignment.TopEnd))
+            SelectionHandle(Modifier.align(Alignment.BottomStart))
+            SelectionHandle(Modifier.align(Alignment.BottomEnd))
+        }
     }
+}
+
+@Composable
+private fun SelectionHandle(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .offset(x = (-4).dp, y = (-4).dp)
+            .size(8.dp)
+            .background(Color.White, RoundedCornerShape(2.dp))
+            .border(1.dp, Color.Black.copy(alpha = 0.65f), RoundedCornerShape(2.dp))
+    )
 }
