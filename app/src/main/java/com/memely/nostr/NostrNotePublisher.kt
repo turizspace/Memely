@@ -50,7 +50,9 @@ class DefaultNostrNotePublisher : NostrNotePublisher {
         val eventId = JSONObject(signedEventJson).getString("id")
         RelayEventTracker.initializeEventTracking(eventId, NostrRepository.relayPool.getCurrentRelays())
 
-        SecureLog.d("NostrNotePublisher: Publishing note ${SecureLog.truncateHex(eventId)}")
+        SecureLog.d("NostrNotePublisher: Publishing note ${SecureLog.truncateHex(eventId)} using optimized posting manager")
+        
+        // Use the new PostingManager for intelligent retry and poor connection handling
         NostrRepository.publishEvent("""["EVENT",$signedEventJson]""")
 
         PublishedNote(eventId = eventId)
