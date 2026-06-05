@@ -29,9 +29,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.memely.di.appContainer
 import com.memely.nostr.MetadataParser
-import com.memely.nostr.AmberSignerManager
 import com.memely.nostr.MemeNote
-import com.memely.nostr.NostrRepository
 import com.memely.nostr.UserMetadataCache
 import com.memely.util.SecureLog
 import kotlinx.coroutines.launch
@@ -76,22 +74,12 @@ fun MemeCard(
         }
     }
     
-    // Fetch metadata synchronously on first composition - ensures card sees the result
+    // Ask the shared cache for metadata without blocking visible card composition.
     LaunchedEffect(memeNote.pubkey) {
         val cachedNow = UserMetadataCache.getCachedMetadata(memeNote.pubkey)
         if (cachedNow == null) {
-            SecureLog.d("MemeCard: Fetching metadata for ${SecureLog.truncateHex(memeNote.pubkey)}")
-            try {
-                val fetchedMetadata = NostrRepository.fetchProfileMetadata(memeNote.pubkey)
-                if (fetchedMetadata != null) {
-                    userMetadata = fetchedMetadata
-                    SecureLog.d("MemeCard: Loaded metadata for ${SecureLog.truncateHex(memeNote.pubkey)}")
-                }
-            } catch (e: Exception) {
-                SecureLog.e("MemeCard: Failed to fetch metadata", e)
-            }
+            UserMetadataCache.requestMetadataAsync(memeNote.pubkey)
         } else {
-            SecureLog.d("MemeCard: Using cached metadata for ${SecureLog.truncateHex(memeNote.pubkey)}")
             userMetadata = cachedNow
         }
     }
