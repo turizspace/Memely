@@ -26,8 +26,16 @@ object MemeRepository {
     
     // Meme-related tags to filter for
     private val memeTags = listOf("meme", "memestr", "memes", "funny")
+    private var hasRequestedMemes = false
+    private var listenerStarted = false
     
-    fun fetchMemes() {
+    fun fetchMemes(forceRefresh: Boolean = false) {
+        if (hasRequestedMemes && !forceRefresh) {
+            return
+        }
+
+        hasRequestedMemes = true
+
         // Subscribe to kind 1 notes with meme tags
         val subscriptionId = "memes-${System.currentTimeMillis()}"
         
@@ -46,16 +54,22 @@ object MemeRepository {
         NostrRepository.broadcast(req)
         
         // Start listening for meme notes
-        startMemeListener(subscriptionId)
+        startMemeListener()
     }
     
-    private fun startMemeListener(subscriptionId: String) {
+    private fun startMemeListener() {
+        if (listenerStarted) {
+            return
+        }
+
+        listenerStarted = true
+
         // Use NostrRepository's scope to launch the listener
         NostrRepository.getScope().launch {
             NostrRepository.incomingMessagesFlow.collect { msg ->
                 try {
                     if (msg.contains("\"kind\":1") && (msg.contains("meme") || msg.contains("memestr"))) {
-                        val memeNote = parseMemeNote(msg, subscriptionId)
+                        val memeNote = parseMemeNote(msg)
                         if (memeNote != null) {
                             // Add to the list and sort by most recent (descending)
                             val currentNotes = _memeNotesFlow.value.toMutableList()
@@ -80,7 +94,7 @@ object MemeRepository {
         }
     }
     
-    private fun parseMemeNote(msg: String, subscriptionId: String): MemeNote? {
+    private fun parseMemeNote(msg: String): MemeNote? {
         return try {
             if (msg.trim().startsWith("[")) {
                 val arr = JSONArray(msg)
