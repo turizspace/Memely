@@ -27,17 +27,24 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.FlipToBack
+import androidx.compose.material.icons.filled.FlipToFront
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.VerticalAlignBottom
+import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,7 +69,8 @@ import com.memely.ui.tutorial.tutorialTarget
 @Composable
 fun EditorControls(
     canAddText: Boolean,
-    onAddText: () -> Unit,
+    onAddTopText: (() -> Unit)? = null,
+    onAddBottomText: (() -> Unit)? = null,
     onAddImage: () -> Unit,
     onNavigateToHomeFeed: () -> Unit,
     canChangeColor: Boolean,
@@ -80,6 +88,11 @@ fun EditorControls(
     onShowImageEditing: (() -> Unit)? = null,
     selectedIsText: Boolean = false,
     selectedIsImage: Boolean = false,
+    onDuplicateLayer: (() -> Unit)? = null,
+    onBringLayerForward: (() -> Unit)? = null,
+    onSendLayerBackward: (() -> Unit)? = null,
+    onToggleLayerLock: (() -> Unit)? = null,
+    selectedLayerLocked: Boolean = false,
     onGloballyPositioned: (LayoutCoordinates) -> Unit = {},
     onOutlineWidthChange: ((androidx.compose.ui.unit.Dp) -> Unit)? = null,
     outlineWidth: androidx.compose.ui.unit.Dp = 0.dp
@@ -102,22 +115,26 @@ fun EditorControls(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Add Text button
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.tutorialTarget("btn_add_text")
-            ) {
-                IconButton(
-                    onClick = onAddText,
-                    modifier = Modifier.size(40.dp)
+            // Top Text button (preset for top of meme)
+            if (onAddTopText != null) {
+                LayerToolButton(
+                    label = "Top",
+                    enabled = true,
+                    onClick = onAddTopText
                 ) {
-                    Icon(Icons.Default.TextFields, contentDescription = "Add Text", modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.VerticalAlignTop, contentDescription = "Top Text", modifier = Modifier.size(20.dp))
                 }
-                Text(
-                    text = "Text",
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
-                )
+            }
+
+            // Bottom Text button (preset for bottom of meme)
+            if (onAddBottomText != null) {
+                LayerToolButton(
+                    label = "Bottom",
+                    enabled = true,
+                    onClick = onAddBottomText
+                ) {
+                    Icon(Icons.Default.VerticalAlignBottom, contentDescription = "Bottom Text", modifier = Modifier.size(20.dp))
+                }
             }
 
             // Image button with floating menu
@@ -238,6 +255,44 @@ fun EditorControls(
                     fontSize = 10.sp,
                     color = if (canDelete) MaterialTheme.colors.onSurface.copy(alpha = 0.7f) else MaterialTheme.colors.onSurface.copy(alpha = 0.3f)
                 )
+            }
+
+            if (canDelete) {
+                LayerToolButton(
+                    label = if (selectedLayerLocked) "Unlock" else "Lock",
+                    enabled = onToggleLayerLock != null,
+                    onClick = { onToggleLayerLock?.invoke() }
+                ) {
+                    Icon(
+                        if (selectedLayerLocked) Icons.Default.LockOpen else Icons.Default.Lock,
+                        contentDescription = if (selectedLayerLocked) "Unlock Layer" else "Lock Layer",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                LayerToolButton(
+                    label = "Clone",
+                    enabled = onDuplicateLayer != null,
+                    onClick = { onDuplicateLayer?.invoke() }
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate Layer", modifier = Modifier.size(20.dp))
+                }
+
+                LayerToolButton(
+                    label = "Front",
+                    enabled = onBringLayerForward != null,
+                    onClick = { onBringLayerForward?.invoke() }
+                ) {
+                    Icon(Icons.Default.FlipToFront, contentDescription = "Bring Layer Forward", modifier = Modifier.size(20.dp))
+                }
+
+                LayerToolButton(
+                    label = "Back",
+                    enabled = onSendLayerBackward != null,
+                    onClick = { onSendLayerBackward?.invoke() }
+                ) {
+                    Icon(Icons.Default.FlipToBack, contentDescription = "Send Layer Backward", modifier = Modifier.size(20.dp))
+                }
             }
 
             // Outline width control (only for text)
@@ -372,6 +427,35 @@ fun EditorControls(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LayerToolButton(
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier.size(40.dp),
+            enabled = enabled
+        ) {
+            icon()
+        }
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            color = if (enabled) {
+                MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+            } else {
+                MaterialTheme.colors.onSurface.copy(alpha = 0.3f)
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
