@@ -217,8 +217,12 @@ object MemeFileSaver {
                         
                         // Apply corner radius if specified
                         if (overlay.cornerRadius.value > 0) {
-                            val radiusPx = (overlay.cornerRadius.value * density).toInt()
-                            scaledBmp = createRoundedBitmap(scaledBmp, radiusPx)
+                            val radiusPx = (overlay.cornerRadius.value * density * scaleX).toInt()
+                            val roundedBitmap = createRoundedBitmap(scaledBmp, radiusPx)
+                            if (roundedBitmap != scaledBmp) {
+                                scaledBmp.recycle()
+                            }
+                            scaledBmp = roundedBitmap
                         }
 
                         // Apply position scaling, accounting for image offset
@@ -236,6 +240,12 @@ object MemeFileSaver {
                         canvas.save()
                         canvas.translate(scaledX, scaledY) // Position to top-left corner
                         canvas.rotate(overlay.rotation, finalWidth / 2f, finalHeight / 2f) // Rotate around center
+                        canvas.scale(
+                            if (overlay.flipX) -1f else 1f,
+                            if (overlay.flipY) -1f else 1f,
+                            finalWidth / 2f,
+                            finalHeight / 2f
+                        )
                         canvas.drawBitmap(scaledBmp, 0f, 0f, paint)
                         canvas.restore()
                         
@@ -278,9 +288,6 @@ object MemeFileSaver {
                         else -> Paint.Align.LEFT  // Default for Justify or unspecified
                     }
                 }
-
-                // Fixed padding of 8.dp (not scaled with text scale anymore)
-                val textPaddingPx = 8f * density
 
                 // Use the measured width from the editor if available, otherwise calculate it
                 val maxTextWidthPx = if (text.measuredWidthPx > 0) {
@@ -331,13 +338,21 @@ object MemeFileSaver {
                 // Create final paint - USE ONLY BASE SIZE, NOT SCALED
                 // The canvas.scale() will handle the scaling transformation
                 val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = text.color.toArgb()
+                    color = text.color.copy(alpha = text.alpha).toArgb()
                     textSize = textPaintForMeasure.textSize * scaleX  // Only image scale, NOT user scale (canvas.scale will do that)
                     isFakeBoldText = text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold
                     style = Paint.Style.FILL
                     typeface = selectedTypeface  // Apply selected font to final paint
                     // Match the alignment from measure paint
                     textAlign = textPaintForMeasure.textAlign
+                    if (text.shadowEnabled) {
+                        setShadowLayer(
+                            text.shadowBlur.value * density * scaleX,
+                            text.shadowOffsetX.value * density * scaleX,
+                            text.shadowOffsetY.value * density * scaleY,
+                            text.shadowColor.copy(alpha = text.alpha).toArgb()
+                        )
+                    }
                 }
 
                 // Dimensions in display/screen space (before any saves to disk scaling)
@@ -409,12 +424,20 @@ object MemeFileSaver {
                     // Outline width is scaled by image scale (user scale will be applied by canvas.scale())
                     val outlineWidthPx = text.outlineWidth.value * density * scaleX
                     val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = text.outlineColor.toArgb()
+                        color = text.outlineColor.copy(alpha = text.alpha).toArgb()
                         textSize = textPaint.textSize
                         textAlign = textPaint.textAlign
                         style = Paint.Style.FILL
                         typeface = selectedTypeface  // CRITICAL: Apply the SAME font as main text
                         isFakeBoldText = text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold
+                        if (text.shadowEnabled) {
+                            setShadowLayer(
+                                text.shadowBlur.value * density * scaleX,
+                                text.shadowOffsetX.value * density * scaleX,
+                                text.shadowOffsetY.value * density * scaleY,
+                                text.shadowColor.copy(alpha = text.alpha).toArgb()
+                            )
+                        }
                     }
                     
                     // Draw outline text multiple times with offset
