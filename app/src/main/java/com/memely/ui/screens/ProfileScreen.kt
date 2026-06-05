@@ -72,7 +72,9 @@ fun ProfileScreen(
 
                 // Name
                 Text(
-                    text = user?.name ?: "Unknown User",
+                    text = user?.name?.takeIf { it.isNotBlank() && it != "Memely User" }
+                        ?: user?.nip05?.takeIf { it.isNotBlank() }
+                        ?: "Loading profile...",
                     style = MaterialTheme.typography.h6
                 )
 
