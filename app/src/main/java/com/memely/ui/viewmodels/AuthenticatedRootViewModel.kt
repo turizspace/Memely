@@ -24,8 +24,11 @@ class AuthenticatedRootViewModel(
     private val profileRepository: ProfileRepository
 ) : ViewModel() {
     private var lastStartedPubkey: String? = null
+    private var lastPriorityFetchedPubkey: String? = null
+    private var lastPriorityFetchedAt: Long = 0L
     private var lastFetchedPubkey: String? = null
     private var lastFetchedRelayCount: Int = -1
+    private val metadataRefreshIntervalMs = 10 * 60 * 1000L
 
     val uiState: StateFlow<AuthenticatedRootUiState> = combine(
         sessionRepository.sessionState,
@@ -67,6 +70,31 @@ class AuthenticatedRootViewModel(
             SecureLog.d("AuthenticatedRootViewModel: Starting session for ${SecureLog.truncateHex(pubkeyHex)}")
             profileRepository.connectAll()
             profileRepository.startProfileListener(pubkeyHex)
+            refreshSignedInUserMetadata(pubkeyHex, force = true)
+        }
+    }
+
+    fun refreshSignedInUserMetadata(pubkeyHex: String?, force: Boolean = false) {
+        if (pubkeyHex.isNullOrBlank()) {
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val recentlyFetched = lastPriorityFetchedPubkey == pubkeyHex &&
+            now - lastPriorityFetchedAt < metadataRefreshIntervalMs
+        if (!force && recentlyFetched) {
+            return
+        }
+
+        lastPriorityFetchedPubkey = pubkeyHex
+        lastPriorityFetchedAt = now
+
+        viewModelScope.launch {
+            SecureLog.d(
+                "AuthenticatedRootViewModel: Priority metadata refresh for " +
+                    SecureLog.truncateHex(pubkeyHex)
+            )
+            profileRepository.fetchUserMetadata(pubkeyHex)
         }
     }
 
