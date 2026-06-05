@@ -9,10 +9,9 @@ import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.memely.nostr.MemeRepository
@@ -24,21 +23,21 @@ fun MemeFeed(
 ) {
     val memeNotes by MemeRepository.memeNotesFlow.collectAsState()
     val isLoading by MemeRepository.isLoadingFlow.collectAsState()
-    var isRefreshing by remember { mutableStateOf(false) }
+    val authorPubkeys by remember {
+        derivedStateOf { memeNotes.map { it.pubkey }.distinct() }
+    }
     
     // Start fetching memes when component is composed
     LaunchedEffect(Unit) {
-        println("📡 MemeFeed: Starting meme fetch...")
         MemeRepository.fetchMemes()
     }
     
     // Pre-fetch metadata for all memes as they arrive
-    LaunchedEffect(memeNotes) {
-        memeNotes.forEach { memeNote ->
-            val cached = UserMetadataCache.getCachedMetadata(memeNote.pubkey)
+    LaunchedEffect(authorPubkeys) {
+        authorPubkeys.forEach { pubkey ->
+            val cached = UserMetadataCache.getCachedMetadata(pubkey)
             if (cached == null) {
-                println("📊 MemeFeed: Pre-fetching metadata for ${memeNote.pubkey.take(8)}")
-                UserMetadataCache.requestMetadataAsync(memeNote.pubkey)
+                UserMetadataCache.requestMetadataAsync(pubkey)
             }
         }
     }
@@ -58,7 +57,11 @@ fun MemeFeed(
             LazyColumn(
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(memeNotes) { memeNote ->
+                items(
+                    items = memeNotes,
+                    key = { it.id },
+                    contentType = { "meme-card" }
+                ) { memeNote ->
                     MemeCard(
                         memeNote = memeNote,
                         modifier = Modifier.fillMaxWidth()
