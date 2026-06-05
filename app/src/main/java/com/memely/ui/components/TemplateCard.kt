@@ -32,12 +32,11 @@ import com.memely.nostr.Constants
 fun TemplateCard(
     template: MemeTemplate,
     modifier: Modifier = Modifier,
+    isFavorite: Boolean = false,
     onFavoriteToggle: (String, Boolean) -> Unit = { _, _ -> },
     onClick: (MemeTemplate) -> Unit
 ) {
     val context = LocalContext.current
-    val favorites by FavoritesManager.favoritesFlow.collectAsState()
-    val isFavorite = favorites.contains(template.url)
     var showPreview by remember { mutableStateOf(false) }
     
     Card(
