@@ -105,9 +105,7 @@ fun MemeEditorScreen(
         }
     }
 
-    // Screen density and shared padding (8.dp -> px) computed in composable scope
     val screenDensity = context.resources.displayMetrics.density
-    val textPaddingPx = 8f * screenDensity
 
     var showColorPicker by remember { mutableStateOf(false) }
     var showComposeDialog by remember { mutableStateOf(false) }
@@ -118,6 +116,14 @@ fun MemeEditorScreen(
     var uploadedImageUrl by remember { mutableStateOf<String?>(null) }
     var savedMemeFile by remember { mutableStateOf<File?>(null) }
     var showExitConfirmation by remember { mutableStateOf(false) }
+    
+    // Retry support state - store posting context for retries
+    var lastMemeCaption by remember { mutableStateOf<String?>(null) }
+    var lastMemeUrl by remember { mutableStateOf<String?>(null) }
+    var lastPubkeyHex by remember { mutableStateOf<String?>(null) }
+    var lastPrivKeyBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var lastIsUsingAmber by remember { mutableStateOf(false) }
+    var isRetryingPost by remember { mutableStateOf(false) }
     
     // Track if any panel is currently open
     val isPanelOpen = showColorPicker || showTextFormattingPanel || showImageEditingPanel || 
@@ -220,20 +226,8 @@ fun MemeEditorScreen(
             bottomBar = {
                 EditorControls(
                     canAddText = true,
-                    onAddText = {
-                        // Add text at center of the displayed image (accounting for offset)
-                        val centerX = editorViewModel.imageOffsetX + (editorViewModel.baseImageSize.width / 2f)
-                        val centerY = editorViewModel.imageOffsetY + (editorViewModel.baseImageSize.height / 2f)
-
-                        // Account for the 8.dp padding used inside TextLayerBox so stored top-left
-                        // results in the visible text content appearing at the center.
-                        editorViewModel.addText(
-                            androidx.compose.ui.geometry.Offset(
-                                centerX - textPaddingPx,
-                                centerY - textPaddingPx
-                            )
-                        )
-                    },
+                    onAddTopText = { editorViewModel.addTopText(screenDensity) },
+                    onAddBottomText = { editorViewModel.addBottomText(screenDensity) },
                     onAddImage = {
                         overlayLauncher.launch("image/*")
                     },
@@ -428,6 +422,13 @@ fun MemeEditorScreen(
                     onShowImageEditing = { showImageEditingPanel = true },
                     selectedIsText = editorViewModel.selectedIsText && editorViewModel.selectedLayerIndex != null,
                     selectedIsImage = !editorViewModel.selectedIsText && editorViewModel.selectedLayerIndex != null,
+                    onDuplicateLayer = { editorViewModel.duplicateSelected() },
+                    onBringLayerForward = { editorViewModel.bringSelectedForward() },
+                    onSendLayerBackward = { editorViewModel.sendSelectedBackward() },
+                    onToggleLayerLock = { editorViewModel.toggleSelectedLock() },
+                    selectedLayerLocked = editorViewModel.getSelectedText()?.locked
+                        ?: editorViewModel.getSelectedImage()?.locked
+                        ?: false,
                     onGloballyPositioned = {
                         // When the controls are laid out, re-register all tutorial targets
                         // to ensure their positions are correctly captured.
@@ -491,11 +492,19 @@ fun MemeEditorScreen(
                         fontWeight = selectedText.fontWeight,
                         fontStyle = selectedText.fontStyle,
                         textAlign = selectedText.textAlign,
+                        alpha = selectedText.alpha,
+                        shadowEnabled = selectedText.shadowEnabled,
+                        shadowBlur = selectedText.shadowBlur.value,
+                        shadowOffset = selectedText.shadowOffsetX.value,
                         onFontSizeChange = { editorViewModel.updateSelectedTextFontSize(it.sp) },
                         onFontFamilyChange = { editorViewModel.updateSelectedTextFontFamily(it) },
                         onFontWeightChange = { editorViewModel.updateSelectedTextFontWeight(it) },
                         onFontStyleChange = { editorViewModel.updateSelectedTextFontStyle(it) },
-                        onTextAlignChange = { editorViewModel.updateSelectedTextAlign(it) }
+                        onTextAlignChange = { editorViewModel.updateSelectedTextAlign(it) },
+                        onAlphaChange = { editorViewModel.updateSelectedTextAlpha(it) },
+                        onShadowEnabledChange = { editorViewModel.updateSelectedTextShadowEnabled(it) },
+                        onShadowBlurChange = { editorViewModel.updateSelectedTextShadowBlur(it.dp) },
+                        onShadowOffsetChange = { editorViewModel.updateSelectedTextShadowOffset(it.dp) }
                     )
                 },
                 sheetState = textFormattingSheetState,
@@ -529,7 +538,9 @@ fun MemeEditorScreen(
                         onCornerRadiusChange = { editorViewModel.updateSelectedImageCornerRadius(it.dp) },
                         onAlphaChange = { editorViewModel.updateSelectedImageAlpha(it) },
                         onRotationChange = { editorViewModel.updateSelectedImageRotation(it) },
-                        onScaleChange = { editorViewModel.updateSelectedImageScale(it) }
+                        onScaleChange = { editorViewModel.updateSelectedImageScale(it) },
+                        onFlipHorizontal = { editorViewModel.flipSelectedImageHorizontal() },
+                        onFlipVertical = { editorViewModel.flipSelectedImageVertical() }
                     )
                 },
                 sheetState = imageEditingSheetState,
@@ -565,6 +576,13 @@ fun MemeEditorScreen(
                 if (!isUsingAmber && privKeyHex.isNullOrBlank()) {
                     return@ComposeNoteDialog
                 }
+                
+                // Store posting context for retry support
+                lastMemeCaption = caption
+                lastMemeUrl = uploadedImageUrl
+                lastPubkeyHex = pubkeyHex
+                lastPrivKeyBytes = if (!isUsingAmber && privKeyHex != null) privKeyHex.hexToBytes() else null
+                lastIsUsingAmber = isUsingAmber
                 
                 // Configure Amber if using external signer
                 if (isUsingAmber) {
@@ -702,6 +720,125 @@ fun MemeEditorScreen(
             onDismiss = {
                 showRelayStatus = false
             },
+            onRetry = if (publishResult?.acceptanceRate!! < 1.0f) {
+                {
+                    showRelayStatus = false
+                    isRetryingPost = true
+                    
+                    // Retry posting with stored context
+                    if (lastMemeCaption != null && lastMemeUrl != null && lastPubkeyHex != null) {
+                        if (lastIsUsingAmber) {
+                            coroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    nostrPostViewModel.setPostingState()
+                                    
+                                    // Build content with image URL
+                                    val fullContent = if (lastMemeCaption!!.isNotBlank()) {
+                                        "${lastMemeCaption!!}\n\n${lastMemeUrl!!}"
+                                    } else {
+                                        lastMemeUrl!!
+                                    }
+                                    
+                                    // Build tags with image URL
+                                    val tags = mutableListOf<List<String>>()
+                                    tags.add(listOf("imeta", "url ${lastMemeUrl!!}"))
+                                    tags.add(listOf("url", lastMemeUrl!!))
+                                    tags.add(listOf("client", "Memely"))
+                                    tags.add(listOf("t", "meme"))
+                                    tags.add(listOf("t", "memely"))
+                                    
+                                    // Create unsigned event for Amber
+                                    val unsignedEvent = org.json.JSONObject().apply {
+                                        put("kind", 1)
+                                        put("created_at", System.currentTimeMillis() / 1000L)
+                                        put("tags", org.json.JSONArray(tags.map { org.json.JSONArray(it) }))
+                                        put("content", fullContent)
+                                        put("pubkey", lastPubkeyHex)
+                                    }
+                                    
+                                    // Calculate event ID before sending to Amber
+                                    val eventId = NostrEventSigner.calculateEventId(unsignedEvent.toString())
+                                    
+                                    // Sign with Amber
+                                    val result = AmberSignerManager.signEvent(
+                                        unsignedEvent.toString(),
+                                        eventId
+                                    )
+                                    
+                                    if (result.event.isNullOrBlank()) {
+                                        throw Exception("Amber signing failed")
+                                    }
+                                    
+                                    // Extract the actual event ID from the signed event
+                                    val signedEventJson = org.json.JSONObject(result.event)
+                                    val actualEventId = signedEventJson.getString("id")
+                                    
+                                    // Initialize relay tracking with the ACTUAL event ID from signed event
+                                    val relayUrls = NostrRepository.relayPool.getCurrentRelays()
+                                    RelayEventTracker.initializeEventTracking(actualEventId, relayUrls)
+                                    
+                                    // Publish to relays and track responses
+                                    val eventMessage = """["EVENT",${result.event}]"""
+                                    com.memely.nostr.NostrRepository.publishEvent(eventMessage)
+                                    
+                                    // Wait for relay responses (timeout after 5 seconds)
+                                    delay(6000)
+                                    
+                                    // Mark any remaining pending relays as timed out
+                                    RelayEventTracker.getPendingRelays(actualEventId).forEach { relay ->
+                                        RelayEventTracker.recordTimeout(actualEventId, relay)
+                                    }
+                                    
+                                    // Get the publish result using the ACTUAL event ID
+                                    val result_final = RelayEventTracker.getPublishResult(actualEventId)
+                                    RelayEventTracker.completePublish(actualEventId)
+                                    
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        nostrPostViewModel.setSuccessState(actualEventId)
+                                        publishResult = result_final
+                                        isRetryingPost = false
+                                        nostrPostViewModel.reset()
+                                    }
+                                } catch (e: Exception) {
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        nostrPostViewModel.setErrorState("Retry failed: ${e.message}")
+                                        isRetryingPost = false
+                                    }
+                                }
+                            }
+                        } else {
+                            // Use local nsec to sign and publish
+                            if (lastPrivKeyBytes != null) {
+                                nostrPostViewModel.publishNote(
+                                    content = lastMemeCaption!!,
+                                    imageUrl = lastMemeUrl!!,
+                                    pubkeyHex = lastPubkeyHex!!,
+                                    privKeyBytes = lastPrivKeyBytes!!,
+                                    onSuccess = { actualEventId ->
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            delay(5000)
+                                            
+                                            // Mark any remaining pending relays as timed out
+                                            RelayEventTracker.getPendingRelays(actualEventId).forEach { relay ->
+                                                RelayEventTracker.recordTimeout(actualEventId, relay)
+                                            }
+                                            
+                                            val result_final = RelayEventTracker.getPublishResult(actualEventId)
+                                            RelayEventTracker.completePublish(actualEventId)
+
+                                            coroutineScope.launch(Dispatchers.Main) {
+                                                publishResult = result_final
+                                                isRetryingPost = false
+                                                nostrPostViewModel.reset()
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            } else null,
             onExitEditor = {
                 // Exit the editor and return to previous screen
                 onDone(savedMemeFile?.absolutePath ?: "")
