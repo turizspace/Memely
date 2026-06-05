@@ -134,6 +134,8 @@ fun ImageEditingPanel(
     onAlphaChange: (Float) -> Unit,
     onRotationChange: (Float) -> Unit,
     onScaleChange: (Float) -> Unit,
+    onFlipHorizontal: () -> Unit = {},
+    onFlipVertical: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -218,6 +220,34 @@ fun ImageEditingPanel(
                 valueRange = 0.1f..3f,
                 modifier = Modifier.fillMaxWidth()
             )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onFlipHorizontal,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = MaterialTheme.colors.surface
+                )
+            ) {
+                Icon(Icons.Default.SwapHoriz, contentDescription = "Flip Horizontal")
+                Spacer(Modifier.width(8.dp))
+                Text("Flip H")
+            }
+            Button(
+                onClick = onFlipVertical,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = MaterialTheme.colors.surface
+                )
+            ) {
+                Icon(Icons.Default.SwapVert, contentDescription = "Flip Vertical")
+                Spacer(Modifier.width(8.dp))
+                Text("Flip V")
+            }
         }
         
         Divider(modifier = Modifier.padding(vertical = 8.dp))
