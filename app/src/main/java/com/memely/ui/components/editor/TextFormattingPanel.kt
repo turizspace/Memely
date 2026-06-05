@@ -30,11 +30,19 @@ fun TextFormattingPanel(
     fontWeight: FontWeight,
     fontStyle: FontStyle,
     textAlign: TextAlign,
+    alpha: Float = 1f,
+    shadowEnabled: Boolean = false,
+    shadowBlur: Float = 4f,
+    shadowOffset: Float = 2f,
     onFontSizeChange: (Float) -> Unit,
     onFontFamilyChange: (FontFamily) -> Unit,
     onFontWeightChange: (FontWeight) -> Unit,
     onFontStyleChange: (FontStyle) -> Unit,
     onTextAlignChange: (TextAlign) -> Unit,
+    onAlphaChange: (Float) -> Unit = {},
+    onShadowEnabledChange: (Boolean) -> Unit = {},
+    onShadowBlurChange: (Float) -> Unit = {},
+    onShadowOffsetChange: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showFontMenu by remember { mutableStateOf(false) }
@@ -211,6 +219,80 @@ fun TextFormattingPanel(
                 )
             ) {
                 Icon(Icons.Default.FormatAlignRight, contentDescription = "Align Right")
+            }
+        }
+
+        Divider()
+
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Opacity", style = MaterialTheme.typography.body2)
+                Text("${(alpha * 100).toInt()}%", style = MaterialTheme.typography.body2)
+            }
+            Slider(
+                value = alpha,
+                onValueChange = onAlphaChange,
+                valueRange = 0.1f..1f,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onShadowEnabledChange(!shadowEnabled) }
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("Shadow", style = MaterialTheme.typography.body2)
+                Text(
+                    "Drop shadow behind text",
+                    style = MaterialTheme.typography.caption,
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            Switch(
+                checked = shadowEnabled,
+                onCheckedChange = onShadowEnabledChange
+            )
+        }
+
+        if (shadowEnabled) {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Shadow Blur", style = MaterialTheme.typography.body2)
+                    Text("${shadowBlur.toInt()}dp", style = MaterialTheme.typography.body2)
+                }
+                Slider(
+                    value = shadowBlur,
+                    onValueChange = onShadowBlurChange,
+                    valueRange = 0f..24f,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Shadow Offset", style = MaterialTheme.typography.body2)
+                    Text("${shadowOffset.toInt()}dp", style = MaterialTheme.typography.body2)
+                }
+                Slider(
+                    value = shadowOffset,
+                    onValueChange = onShadowOffsetChange,
+                    valueRange = 0f..24f,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
