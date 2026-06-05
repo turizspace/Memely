@@ -11,12 +11,16 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.memely.data.FavoritesManager
 import com.memely.data.MemeTemplate
 import com.memely.ui.viewmodels.TemplateGridScrollState
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
 fun TemplateGrid(
@@ -31,6 +35,8 @@ fun TemplateGrid(
         initialFirstVisibleItemScrollOffset = TemplateGridScrollState.getSavedScrollOffset()
     )
 ) {
+    val favorites by FavoritesManager.favoritesFlow.collectAsState()
+
     Box(
         modifier = modifier.fillMaxSize()
     ) {
@@ -84,8 +90,10 @@ fun TemplateGrid(
                 // Save scroll position whenever grid state changes
                 LaunchedEffect(gridState) {
                     snapshotFlow {
-                        gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
-                    }.collect {
+                        gridState.firstVisibleItemIndex to (gridState.firstVisibleItemScrollOffset / 80)
+                    }
+                    .distinctUntilChanged()
+                    .collect {
                         TemplateGridScrollState.saveScrollPosition(gridState)
                     }
                 }
@@ -99,9 +107,14 @@ fun TemplateGrid(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(templates) { template ->
+                    items(
+                        items = templates,
+                        key = { it.url },
+                        contentType = { "template-card" }
+                    ) { template ->
                         TemplateCard(
                             template = template,
+                            isFavorite = favorites.contains(template.url),
                             onClick = onTemplateClick,
                             onFavoriteToggle = { _, _ ->
                                 onFavoriteChanged()
