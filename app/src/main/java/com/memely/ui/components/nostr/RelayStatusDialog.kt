@@ -34,11 +34,13 @@ import com.memely.nostr.*
 fun RelayStatusDialog(
     publishResult: PublishResult?,
     onDismiss: () -> Unit,
+    onRetry: (() -> Unit)? = null,
     onExitEditor: () -> Unit = {}
 ) {
     if (publishResult == null) return
 
     var expandedSection by remember { mutableStateOf("accepted") }
+    val showRetryButton = onRetry != null && publishResult.acceptanceRate < 1.0f
     
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -134,6 +136,18 @@ fun RelayStatusDialog(
                 Divider()
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // Retry hint
+                if (showRetryButton) {
+                    Text(
+                        text = "💡 Some relays didn't accept your post. Tap Retry to send again.",
+                        style = MaterialTheme.typography.caption,
+                        color = MaterialTheme.colors.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                    )
+                }
+
                 // Action Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -143,6 +157,28 @@ fun RelayStatusDialog(
                     TextButton(onClick = onDismiss) {
                         Text("Keep Editing")
                     }
+                    
+                    if (showRetryButton && onRetry != null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                onDismiss()
+                                onRetry()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                backgroundColor = MaterialTheme.colors.secondary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Retry")
+                        }
+                    }
+                    
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
