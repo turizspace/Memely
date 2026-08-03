@@ -40,7 +40,7 @@ fun RelayStatusDialog(
     if (publishResult == null) return
 
     var expandedSection by remember { mutableStateOf("accepted") }
-    val showRetryButton = onRetry != null && publishResult.acceptanceRate < 1.0f
+    val showRetryButton = onRetry != null && publishResult.acceptedRelays.isEmpty()
     
     Dialog(onDismissRequest = onDismiss) {
         Card(
