@@ -37,6 +37,7 @@ import com.memely.ui.components.editor.TextFormattingPanel
 import com.memely.ui.components.editor.ImageEditingPanel
 import com.memely.ui.components.editor.TemplateSelectorDialog
 import com.memely.ui.utils.MemeFileSaver
+import com.memely.ui.utils.OrientedImageDecoder
 import com.memely.ui.viewmodels.MemeEditorViewModel
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -165,13 +166,7 @@ fun MemeEditorScreen(
     // Overlay image picker
     val overlayLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
-            // Get original image dimensions
-            val inputStream = context.contentResolver.openInputStream(uri)
-            val options = android.graphics.BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
-            }
-            android.graphics.BitmapFactory.decodeStream(inputStream, null, options)
-            inputStream?.close()
+            val dimensions = OrientedImageDecoder.bounds(context, uri) ?: return@let
 
             // Calculate an initial top-left position so the overlay appears centered over the displayed image.
             // The ViewModel stores layer.position as the top-left offset in container coordinates.
@@ -179,8 +174,8 @@ fun MemeEditorScreen(
             // Use the model's default display width (so we don't duplicate the literal 150.dp)
             val defaultDisplayDpValue = MemeOverlayImage(
                 uri = uri,
-                originalWidth = options.outWidth,
-                originalHeight = options.outHeight,
+                originalWidth = dimensions.width,
+                originalHeight = dimensions.height,
                 position = androidx.compose.ui.geometry.Offset(0f, 0f)
             ).displayWidth.value
 
@@ -192,14 +187,15 @@ fun MemeEditorScreen(
 
             // Convert center to top-left by subtracting half of display size (so overlay center aligns)
             val initialX = centerX - (displayWidthPx / 2f)
-            val displayHeightPx = displayWidthPx * (options.outHeight.toFloat() / options.outWidth.toFloat())
+            val displayHeightPx = displayWidthPx * (dimensions.height.toFloat() / dimensions.width.toFloat())
             val initialY = centerY - (displayHeightPx / 2f)
 
             editorViewModel.addOverlay(
                 uri,
-                options.outWidth,
-                options.outHeight,
-                androidx.compose.ui.geometry.Offset(initialX, initialY)
+                dimensions.width,
+                dimensions.height,
+                initialPosition = androidx.compose.ui.geometry.Offset(initialX, initialY),
+                density = screenDensity
             )
         }
     }
@@ -861,14 +857,11 @@ fun MemeEditorScreen(
                             // Most meme templates are roughly 500x500 to 1000x1000
                             Pair(800, 800)
                         } else {
-                            // For local content URIs, get actual dimensions
-                            val inputStream = context.contentResolver.openInputStream(templateUri)
-                            val options = android.graphics.BitmapFactory.Options().apply {
-                                inJustDecodeBounds = true
-                            }
-                            android.graphics.BitmapFactory.decodeStream(inputStream, null, options)
-                            inputStream?.close()
-                            Pair(options.outWidth, options.outHeight)
+                            // For local content URIs, use the same EXIF-aware size
+                            // that Coil shows in the editor and the saver exports.
+                            OrientedImageDecoder.bounds(context, templateUri)
+                                ?.let { Pair(it.width, it.height) }
+                                ?: Pair(800, 800)
                         }
 
                         coroutineScope.launch(Dispatchers.Main) {
@@ -894,7 +887,8 @@ fun MemeEditorScreen(
                                 templateUri,
                                 dimensions.first,
                                 dimensions.second,
-                                androidx.compose.ui.geometry.Offset(initialX, initialY)
+                                initialPosition = androidx.compose.ui.geometry.Offset(initialX, initialY),
+                                density = screenDensity
                             )
                             
                             showTemplateSelector = false
