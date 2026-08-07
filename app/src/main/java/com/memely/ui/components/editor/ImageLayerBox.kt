@@ -71,6 +71,10 @@ fun ImageLayerBox(
     Box(
         modifier = modifier
             .size(width = width, height = height)
+            // Place the layer in canvas coordinates before applying its local
+            // transform. This is the same T(position) * R * F order used by the
+            // saver, so rotating or flipping never changes its anchor point.
+            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
             .graphicsLayer(
                 rotationZ = rotation,
                 alpha = overlay.alpha,
@@ -78,7 +82,6 @@ fun ImageLayerBox(
                 scaleY = if (overlay.flipY) -1f else 1f,
                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f) // Transform from top-left to match offset
             )
-            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
             .border(
                 width = if (overlay.selected) 2.dp else 0.dp,
                 color = if (overlay.selected) {
