@@ -19,6 +19,7 @@ import coil.compose.AsyncImage
 import android.net.Uri
 import com.memely.util.SecureLog
 import com.memely.ui.viewmodels.MemeEditorViewModel
+import com.memely.ui.utils.OrientedImageDecoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -82,14 +83,10 @@ fun MemeCanvas(
     LaunchedEffect(dimensionImageUri) {
         val resolvedImageUri = dimensionImageUri ?: return@LaunchedEffect
         try {
-            val inputStream = context.contentResolver.openInputStream(resolvedImageUri)
-            val options = android.graphics.BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
-            }
-            android.graphics.BitmapFactory.decodeStream(inputStream, null, options)
-            originalImageWidth = options.outWidth
-            originalImageHeight = options.outHeight
-            inputStream?.close()
+            val dimensions = OrientedImageDecoder.bounds(context, resolvedImageUri)
+                ?: return@LaunchedEffect
+            originalImageWidth = dimensions.width
+            originalImageHeight = dimensions.height
             viewModel.updateOriginalImageSize(originalImageWidth, originalImageHeight)
             SecureLog.d("MemeCanvas: Image dimensions ${originalImageWidth}x${originalImageHeight}")
         } catch (e: Exception) {
