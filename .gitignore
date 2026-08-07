@@ -67,3 +67,8 @@ out/
 ehthumbs.db
 Thumbs.db
 .vscode/
+
+# keystore properties 
+key*
+*.php
+LICENSE
