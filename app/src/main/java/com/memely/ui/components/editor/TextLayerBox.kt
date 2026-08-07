@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -79,6 +80,20 @@ fun TextLayerBox(
         TextAlign.Center -> Alignment.Center
         else -> Alignment.CenterStart
     }
+    // Explicitly disable legacy font padding. The saver uses StaticLayout with
+    // includePad=false; leaving this implicit made the editor's glyph baseline
+    // differ by the font's top/bottom padding from the exported text.
+    val mainTextStyle = TextStyle(
+        color = textColor,
+        fontSize = text.fontSize,
+        fontFamily = text.fontFamily,
+        fontWeight = text.fontWeight,
+        fontStyle = text.fontStyle,
+        textAlign = text.textAlign,
+        shadow = textShadow,
+        platformStyle = PlatformTextStyle(includeFontPadding = false)
+    )
+    val outlineTextStyle = mainTextStyle.copy(color = outlineColor)
     
     // Render the actual text content in a separate composable to ensure consistent sizing
     @Composable
@@ -98,15 +113,7 @@ fun TextLayerBox(
                                 BasicTextField(
                                     value = textValue,
                                     onValueChange = {},
-                                    textStyle = TextStyle(
-                                        color = outlineColor,
-                                        fontSize = text.fontSize,
-                                        fontFamily = text.fontFamily,
-                                        fontWeight = text.fontWeight,
-                                        fontStyle = text.fontStyle,
-                                        textAlign = text.textAlign,
-                                        shadow = textShadow
-                                    ),
+                                    textStyle = outlineTextStyle,
                                     modifier = Modifier.offset(
                                         x = (offsetX * text.outlineWidth.value / 2).dp,
                                         y = (offsetY * text.outlineWidth.value / 2).dp
@@ -119,15 +126,7 @@ fun TextLayerBox(
                             } else {
                                 Text(
                                     text = text.text,
-                                    style = TextStyle(
-                                        color = outlineColor,
-                                        fontSize = text.fontSize,
-                                        fontFamily = text.fontFamily,
-                                        fontWeight = text.fontWeight,
-                                        fontStyle = text.fontStyle,
-                                        textAlign = text.textAlign,
-                                        shadow = textShadow
-                                    ),
+                                    style = outlineTextStyle,
                                     modifier = Modifier.offset(
                                         x = (offsetX * text.outlineWidth.value / 2).dp,
                                         y = (offsetY * text.outlineWidth.value / 2).dp
@@ -148,15 +147,7 @@ fun TextLayerBox(
                         textValue = it
                         onTextChange(it)
                     },
-                    textStyle = TextStyle(
-                        color = textColor,
-                        fontSize = text.fontSize,
-                        fontFamily = text.fontFamily,
-                        fontWeight = text.fontWeight,
-                        fontStyle = text.fontStyle,
-                        textAlign = text.textAlign,
-                        shadow = textShadow
-                    ),
+                    textStyle = mainTextStyle,
                     modifier = Modifier
                         .widthIn(max = text.maxWidth)
                         .wrapContentSize(),
@@ -167,15 +158,7 @@ fun TextLayerBox(
             } else {
                 Text(
                     text = text.text,
-                    style = TextStyle(
-                        color = textColor,
-                        fontSize = text.fontSize,
-                        fontFamily = text.fontFamily,
-                        fontWeight = text.fontWeight,
-                        fontStyle = text.fontStyle,
-                        textAlign = text.textAlign,
-                        shadow = textShadow
-                    ),
+                    style = mainTextStyle,
                     maxLines = Int.MAX_VALUE
                 )
             }
@@ -185,13 +168,15 @@ fun TextLayerBox(
     // Main text box container - size is determined by TextContent but stays consistent
     Box(
         modifier = modifier
+            // Offset is outside the graphics layer so the saved layer and the
+            // preview both use the same top-left transform anchor.
+            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
             .graphicsLayer(
                 rotationZ = rotation,
                 scaleX = scale,
                 scaleY = scale,
                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f) // Transform from top-left
             )
-            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
             .border(
                 width = if (text.selected) 2.dp else 0.dp,
                 color = if (text.selected) {
@@ -211,10 +196,10 @@ fun TextLayerBox(
                 }
             }
             .clickable { onSelect() }
-            .padding(8.dp) // Fixed padding, not scaled
             .onGloballyPositioned { coordinates ->
                 measuredSize = coordinates.size
-                // Report width for saving purposes (includes padding)
+                // This callback is outside the padding modifier, so it reports
+                // the full unscaled layer width that the saver needs.
                 if (coordinates.size.width > 0) {
                     val measuredWidthPx = coordinates.size.width.toFloat()
                     if (measuredWidthPx != lastMeasuredWidthPx) {
@@ -223,6 +208,7 @@ fun TextLayerBox(
                     }
                 }
             }
+            .padding(8.dp) // Fixed padding, transformed with the text layer
     ) {
         TextContent()
         
