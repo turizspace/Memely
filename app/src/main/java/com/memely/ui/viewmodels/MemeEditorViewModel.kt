@@ -176,7 +176,13 @@ class MemeEditorViewModel : ViewModel() {
         selectedIsText = true
     }
 
-    fun addOverlay(uri: Uri, originalWidth: Int, originalHeight: Int, initialPosition: androidx.compose.ui.geometry.Offset? = null) {
+    fun addOverlay(
+        uri: Uri,
+        originalWidth: Int,
+        originalHeight: Int,
+        density: Float,
+        initialPosition: androidx.compose.ui.geometry.Offset? = null
+    ) {
         // Deselect all existing
         texts = texts.map { it.copy(selected = false) }
         overlays = overlays.map { it.copy(selected = false) }
@@ -185,28 +191,28 @@ class MemeEditorViewModel : ViewModel() {
         val centerImageX = imageOffsetX + (baseImageSize.width / 2f)
         val centerImageY = imageOffsetY + (baseImageSize.height / 2f)
         
-        // Default overlay display size (150dp)
-        val defaultDisplayWidth = 150f // in dp units, will be converted in the Box
-        val aspectRatio = originalWidth.toFloat() / originalHeight.toFloat()
-        val displayHeight = defaultDisplayWidth / aspectRatio
+        // Layer positions are always screen pixels. Convert the default 150.dp
+        // display width before using it to derive the initial top-left position.
+        val defaultDisplayWidth = 150f
+        val defaultDisplayWidthPx = defaultDisplayWidth * density
+        val aspectRatio = (originalWidth.toFloat() / originalHeight.coerceAtLeast(1)).coerceAtLeast(0.01f)
+        val displayHeightPx = defaultDisplayWidthPx / aspectRatio
         
-        // For initial add, position should be top-left, so subtract half the size to center
-        // Note: needs density to convert from dp to pixels, but we'll use the displayWidth value directly
+        // For an automatic initial add, position the top-left so the visual layer
+        // is centered over the displayed image.
         val posX = if (initialPosition != null) {
             initialPosition.x
         } else {
-            // Center the overlay: subtract half of display width (in approximate pixels)
-            centerImageX - (defaultDisplayWidth / 2f)
+            centerImageX - (defaultDisplayWidthPx / 2f)
         }
         
         val posY = if (initialPosition != null) {
             initialPosition.y
         } else {
-            // Center the overlay: subtract half of display height
-            centerImageY - (displayHeight / 2f)
+            centerImageY - (displayHeightPx / 2f)
         }
 
-        SecureLog.d("MemeEditorViewModel: Adding overlay at position=($posX, $posY), size=$defaultDisplayWidth x $displayHeight")
+        SecureLog.d("MemeEditorViewModel: Adding overlay at position=($posX, $posY), size=${defaultDisplayWidthPx}x$displayHeightPx")
 
         val overlayImage = MemeOverlayImage(
             uri = uri,
