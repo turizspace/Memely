@@ -239,9 +239,13 @@ object MemeFileSaver {
                 val density = context.resources.displayMetrics.density
                 val scaledDensity = density * context.resources.configuration.fontScale
 
-                val typefaceStyle =
-                    (if (text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold) Typeface.BOLD else Typeface.NORMAL) or
-                        (if (text.fontStyle == androidx.compose.ui.text.font.FontStyle.Italic) Typeface.ITALIC else Typeface.NORMAL)
+                val typefaceStyle = when {
+                    text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold &&
+                        text.fontStyle == androidx.compose.ui.text.font.FontStyle.Italic -> Typeface.BOLD_ITALIC
+                    text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold -> Typeface.BOLD
+                    text.fontStyle == androidx.compose.ui.text.font.FontStyle.Italic -> Typeface.ITALIC
+                    else -> Typeface.NORMAL
+                }
                 val resolvedTypeface = Typeface.create(
                     FontCatalog.getFontTypeface(text.fontFamily, context),
                     typefaceStyle
@@ -279,13 +283,18 @@ object MemeFileSaver {
                 }
 
                 val textLayout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    StaticLayout.Builder.obtain(text.text, 0, text.text.length, textPaint, contentWidthPx)
+                    val builder = StaticLayout.Builder.obtain(text.text, 0, text.text.length, textPaint, contentWidthPx)
                         .setAlignment(layoutAlignment)
                         .setLineSpacing(0f, 1f)
                         .setIncludePad(false)
-                        .setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE)
-                        .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
-                        .build()
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        @Suppress("WrongConstant")
+                        builder.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE)
+                            .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
+                    }
+
+                    builder.build()
                 } else {
                     @Suppress("DEPRECATION")
                     StaticLayout(
