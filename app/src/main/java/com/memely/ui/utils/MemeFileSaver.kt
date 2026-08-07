@@ -5,13 +5,16 @@ import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
 import androidx.compose.ui.unit.dp
 import android.os.Environment
 import android.provider.MediaStore
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.IntSize
 import com.memely.network.SecureHttpClient
@@ -22,60 +25,10 @@ import com.memely.util.SecureLog
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 object MemeFileSaver {
-    
-    /**
-     * Wraps text to fit within a maximum width by breaking it into lines at word boundaries.
-     * This matches Compose's text wrapping behavior for WYSIWYG rendering.
-     */
-    private fun wrapText(text: String, paint: Paint, maxWidth: Float): List<String> {
-        if (maxWidth <= 0) return text.split("\n")
-        
-        val lines = mutableListOf<String>()
-        
-        // First split by manual newlines
-        val paragraphs = text.split("\n")
-        
-        paragraphs.forEach { paragraph ->
-            if (paragraph.isEmpty()) {
-                lines.add("")
-                return@forEach
-            }
-            
-            val words = paragraph.split(" ")
-            var currentLine = ""
-            
-            words.forEach { word ->
-                val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
-                val testWidth = paint.measureText(testLine)
-                
-                if (testWidth <= maxWidth) {
-                    currentLine = testLine
-                } else {
-                    // Current line is full, start a new line
-                    if (currentLine.isNotEmpty()) {
-                        lines.add(currentLine)
-                    }
-                    currentLine = word
-                    
-                    // If single word is too long, we still add it (can't break further)
-                    if (paint.measureText(word) > maxWidth) {
-                        lines.add(currentLine)
-                        currentLine = ""
-                    }
-                }
-            }
-            
-            // Add the last line
-            if (currentLine.isNotEmpty()) {
-                lines.add(currentLine)
-            }
-        }
-        
-        return lines.ifEmpty { listOf(text) }
-    }
-    
     private fun downloadImageToCache(context: Context, url: String): Uri? {
         return try {
             val httpClient = SecureHttpClient.createDownloadClient()
@@ -98,25 +51,38 @@ object MemeFileSaver {
     }
 
     private fun decodeImageBounds(context: Context, uri: Uri): IntSize? {
-        val options = android.graphics.BitmapFactory.Options().apply {
-            inJustDecodeBounds = true
-        }
-
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            android.graphics.BitmapFactory.decodeStream(input, null, options)
-        }
-
-        return if (options.outWidth > 0 && options.outHeight > 0) {
-            IntSize(options.outWidth, options.outHeight)
-        } else {
-            null
-        }
+        return OrientedImageDecoder.bounds(context, uri)
     }
 
     private fun decodeBitmap(context: Context, uri: Uri): Bitmap? {
-        return context.contentResolver.openInputStream(uri)?.use { input ->
-            android.graphics.BitmapFactory.decodeStream(input)
+        return OrientedImageDecoder.decode(context, uri)
+    }
+
+    private fun resolveImageUri(context: Context, uri: Uri): Uri? {
+        return if (uri.isRemote()) downloadImageToCache(context, uri.toString()) else uri
+    }
+
+    private fun cropToContentScaleCrop(bitmap: Bitmap, targetWidth: Int, targetHeight: Int): Bitmap {
+        val sourceAspect = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
+        val targetAspect = targetWidth.toFloat() / targetHeight.coerceAtLeast(1)
+        if (kotlin.math.abs(sourceAspect - targetAspect) < 0.0001f) return bitmap
+
+        val cropWidth: Int
+        val cropHeight: Int
+        if (sourceAspect > targetAspect) {
+            cropHeight = bitmap.height
+            cropWidth = (cropHeight * targetAspect).roundToInt().coerceIn(1, bitmap.width)
+        } else {
+            cropWidth = bitmap.width
+            cropHeight = (cropWidth / targetAspect).roundToInt().coerceIn(1, bitmap.height)
         }
+        val left = ((bitmap.width - cropWidth) / 2f).roundToInt().coerceAtLeast(0)
+        val top = ((bitmap.height - cropHeight) / 2f).roundToInt().coerceAtLeast(0)
+        return Bitmap.createBitmap(bitmap, left, top, cropWidth, cropHeight)
+    }
+
+    private fun Uri.isRemote(): Boolean {
+        return scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true)
     }
     
     fun saveMeme(
@@ -133,11 +99,7 @@ object MemeFileSaver {
         onError: () -> Unit
     ) {
         try {
-            val resolvedUri = if (imageUri.toString().startsWith("http")) {
-                downloadImageToCache(context, imageUri.toString())
-            } else {
-                imageUri
-            }
+            val resolvedUri = resolveImageUri(context, imageUri)
 
             if (resolvedUri == null) {
                 SecureLog.e("MemeFileSaver: Unable to resolve source image URI for saving")
@@ -185,39 +147,57 @@ object MemeFileSaver {
             canvas.drawBitmap(baseBmp, 0f, 0f, paint)
             baseBmp.recycle()
 
-            // Calculate scale factors between displayed size and original size
-            // Use separate X and Y scales to handle any aspect ratio differences
+            // Map the editor's screen-space canvas to the saved bitmap. Keep this
+            // transform on the canvas instead of baking it into each layer before
+            // rotation: ContentScale.Fit can differ by a pixel on each axis, and
+            // pre-scaling a layer makes rotated layers visibly skew or drift.
             val scaleX = baseWidth.toFloat() / baseImageSize.width.toFloat()
             val scaleY = baseHeight.toFloat() / baseImageSize.height.toFloat()
-            
-            // For ContentScale.Fit, both scales should be the same, but calculate separately for robustness
-            val scale = scaleX  // Use scaleX for uniform scaling (should equal scaleY for Fit)
 
-            println("🔍 MemeFileSaver: Original=${baseWidth}x${baseHeight}, Displayed=${baseImageSize.width}x${baseImageSize.height}, Offset=(${imageOffsetX},${imageOffsetY}), ScaleX=${scaleX}, ScaleY=${scaleY}")
+            canvas.save()
+            canvas.scale(scaleX, scaleY)
+            canvas.translate(-imageOffsetX, -imageOffsetY)
 
-            // Draw overlay images - FIXED POSITIONING
+            // Draw overlay images in the exact coordinate system used by ImageLayerBox:
+            // layout size (which already includes user scale), then a top-left
+            // rotation/flip graphics layer, then the rounded screen-space offset.
             overlays.forEach { overlay ->
-                context.contentResolver.openInputStream(overlay.uri)?.use {
-                    android.graphics.BitmapFactory.decodeStream(it)?.let { overlayBmp ->
-                        // Calculate the display size in pixels (convert dp to pixels first)
+                val overlayUri = resolveImageUri(context, overlay.uri)
+                if (overlayUri == null) {
+                    SecureLog.e("MemeFileSaver: Unable to resolve overlay URI ${overlay.uri}")
+                    return@forEach
+                }
+                decodeBitmap(context, overlayUri)?.let { overlayBmp ->
                         val density = context.resources.displayMetrics.density
-                        val displayWidthPx = overlay.displayWidth.value * density
-                        val displayHeightPx = displayWidthPx * overlayBmp.height / overlayBmp.width
-                        
-                        // Apply user's scale and convert to original image coordinates
-                        val finalWidth = (displayWidthPx * overlay.scale * scale).toInt()
-                        val finalHeight = (displayHeightPx * overlay.scale * scale).toInt()
+                        val displayWidthPx =
+                            (overlay.displayWidth.value * density * overlay.scale).roundToInt()
+                                .coerceAtLeast(1)
+                        val aspectRatio = overlay.originalWidth.toFloat()
+                            .div(overlay.originalHeight.coerceAtLeast(1))
+                            .takeIf { it > 0f }
+                            ?: overlayBmp.width.toFloat() / overlayBmp.height.coerceAtLeast(1)
+                        val displayHeightPx =
+                            (displayWidthPx / aspectRatio).roundToInt().coerceAtLeast(1)
 
-                        var scaledBmp = Bitmap.createScaledBitmap(
+                        val croppedBmp = cropToContentScaleCrop(
                             overlayBmp,
-                            finalWidth,
-                            finalHeight,
+                            displayWidthPx,
+                            displayHeightPx
+                        )
+                        var scaledBmp = Bitmap.createScaledBitmap(
+                            croppedBmp,
+                            displayWidthPx,
+                            displayHeightPx,
                             true
                         )
-                        
-                        // Apply corner radius if specified
+                        if (croppedBmp !== overlayBmp) {
+                            croppedBmp.recycle()
+                        }
+
+                        // ImageLayerBox clips the already-sized image, so its radius
+                        // belongs in editor pixels and is transformed with the layer.
                         if (overlay.cornerRadius.value > 0) {
-                            val radiusPx = (overlay.cornerRadius.value * density * scaleX).toInt()
+                            val radiusPx = (overlay.cornerRadius.value * density).roundToInt()
                             val roundedBitmap = createRoundedBitmap(scaledBmp, radiusPx)
                             if (roundedBitmap != scaledBmp) {
                                 scaledBmp.recycle()
@@ -225,243 +205,229 @@ object MemeFileSaver {
                             scaledBmp = roundedBitmap
                         }
 
-                        // Apply position scaling, accounting for image offset
-                        // Use separate X/Y scales for accurate positioning
-                        val adjustedX = overlay.position.x - imageOffsetX
-                        val adjustedY = overlay.position.y - imageOffsetY
-                        val scaledX = adjustedX * scaleX
-                        val scaledY = adjustedY * scaleY
-
-                        // Apply alpha to paint
                         paint.alpha = (overlay.alpha * 255).toInt()
-
-                        // FIX: Draw at exact position without extra translations
-                        println("🔎 MemeFileSaver overlay: uri=${overlay.uri}, pos=(${overlay.position.x},${overlay.position.y}), adjusted=(${adjustedX},${adjustedY}), scaled=(${scaledX},${scaledY}), final=(${finalWidth}x${finalHeight}), userScale=${overlay.scale}, rotation=${overlay.rotation}, alpha=${overlay.alpha}, cornerRadius=${overlay.cornerRadius.value}")
                         canvas.save()
-                        canvas.translate(scaledX, scaledY) // Position to top-left corner
-                        canvas.rotate(overlay.rotation, finalWidth / 2f, finalHeight / 2f) // Rotate around center
+                        canvas.translate(
+                            overlay.position.x.roundToInt().toFloat(),
+                            overlay.position.y.roundToInt().toFloat()
+                        )
+                        if (overlay.rotation != 0f) canvas.rotate(overlay.rotation)
                         canvas.scale(
                             if (overlay.flipX) -1f else 1f,
-                            if (overlay.flipY) -1f else 1f,
-                            finalWidth / 2f,
-                            finalHeight / 2f
+                            if (overlay.flipY) -1f else 1f
                         )
+                        // A top-left graphicsLayer with scale=-1 moves pixels into
+                        // negative local coordinates; do not compensate the draw
+                        // origin or the saved flip will differ from the editor.
                         canvas.drawBitmap(scaledBmp, 0f, 0f, paint)
                         canvas.restore()
-                        
-                        // Reset paint alpha
                         paint.alpha = 255
 
                         scaledBmp.recycle()
                         overlayBmp.recycle()
-                    }
                 }
             }
 
-            // Draw text layers - ACCOUNTING FOR SCALE/ROTATION TRANSFORMS
+            // Draw text in editor pixels, then let the same canvas mapping above
+            // convert the complete local transform to bitmap pixels. This matches
+            // TextLayerBox's graphicsLayer(transformOrigin = top-left).
             texts.forEach { text ->
-                // Skip empty text
                 if (text.text.isBlank()) {
-                    println("⚠️ MemeFileSaver: Skipping empty text")
                     return@forEach
                 }
-                
+
                 val density = context.resources.displayMetrics.density
+                val scaledDensity = density * context.resources.configuration.fontScale
 
-                // Get the typeface for the selected font
-                val selectedTypeface = FontCatalog.getFontTypeface(text.fontFamily, context)
-                
-                // First paint at display scale to measure text dimensions in screen space
-                val textPaintForMeasure = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = text.color.toArgb()
-                    textSize = text.fontSize.value * density  // Base fontSize only (scale handled separately)
-                    isFakeBoldText = text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold
-                    style = Paint.Style.FILL
-                    typeface = selectedTypeface  // Apply selected font
-                    // Convert Compose TextAlign to Paint.Align
-                    textAlign = when (text.textAlign) {
-                        androidx.compose.ui.text.style.TextAlign.Left,
-                        androidx.compose.ui.text.style.TextAlign.Start -> Paint.Align.LEFT
-                        androidx.compose.ui.text.style.TextAlign.Center -> Paint.Align.CENTER
-                        androidx.compose.ui.text.style.TextAlign.Right,
-                        androidx.compose.ui.text.style.TextAlign.End -> Paint.Align.RIGHT
-                        else -> Paint.Align.LEFT  // Default for Justify or unspecified
-                    }
-                }
-
-                // Use the measured width from the editor if available, otherwise calculate it
-                val maxTextWidthPx = if (text.measuredWidthPx > 0) {
-                    text.measuredWidthPx
-                } else {
-                    text.maxWidth.value * density  // Base maxWidth (scale handled separately)
-                }
-                
-                // Wrap text to match Compose's text wrapping behavior
-                val lines = wrapText(text.text, textPaintForMeasure, maxTextWidthPx)
-                
-                // Measure text dimensions in display space (before scaling to original image)
-                val fm = textPaintForMeasure.fontMetrics
-                val lineHeight = fm.descent - fm.ascent
-                val baselineOffset = -fm.ascent
-                
-                // Calculate total text height in display space
-                val totalTextHeight = lineHeight * lines.size
-                
-                // Find the widest line for rotation center calculation
-                val textWidth = lines.maxOfOrNull { line -> textPaintForMeasure.measureText(line) } ?: 0f
-                
-                // Debug: Log text layout info
-                println("🔤 Text layout: maxWidth=${maxTextWidthPx}, lines=${lines.size}, widest=${textWidth}, text='${text.text.take(50)}...'")
-                lines.forEachIndexed { i, line -> 
-                    val lineWidth = textPaintForMeasure.measureText(line)
-                    println("   Line $i: width=${lineWidth}, text='$line'")
-                }
-                
-                // COORDINATE SYSTEM:
-                // text.position.x/y = screen/canvas coordinates (where user placed the OUTER Box)
-                // The TextLayerBox has padding(8.dp) INSIDE the graphicsLayer transforms
-                // This means the actual text content starts at position + 8.dp (in display space)
-                // But padding is applied BEFORE scale, so we need to add the padding amount
-                
-                val textPaddingDisplayPx = 8f * density  // Match the 8.dp from TextLayerBox
-                
-                val posRelativeToImage = Offset(
-                    text.position.x - imageOffsetX + textPaddingDisplayPx,
-                    text.position.y - imageOffsetY + textPaddingDisplayPx
+                val typefaceStyle =
+                    (if (text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold) Typeface.BOLD else Typeface.NORMAL) or
+                        (if (text.fontStyle == androidx.compose.ui.text.font.FontStyle.Italic) Typeface.ITALIC else Typeface.NORMAL)
+                val resolvedTypeface = Typeface.create(
+                    FontCatalog.getFontTypeface(text.fontFamily, context),
+                    typefaceStyle
                 )
-                
-                // Now scale to original image coordinates using separate X/Y scales
-                // Also apply user's scale transform to match graphicsLayer scaling
-                val scaledX = posRelativeToImage.x * scaleX
-                val scaledY = posRelativeToImage.y * scaleY
-
-                // Create final paint - USE ONLY BASE SIZE, NOT SCALED
-                // The canvas.scale() will handle the scaling transformation
-                val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = text.color.copy(alpha = text.alpha).toArgb()
-                    textSize = textPaintForMeasure.textSize * scaleX  // Only image scale, NOT user scale (canvas.scale will do that)
-                    isFakeBoldText = text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold
-                    style = Paint.Style.FILL
-                    typeface = selectedTypeface  // Apply selected font to final paint
-                    // Match the alignment from measure paint
-                    textAlign = textPaintForMeasure.textAlign
+                    textSize = text.fontSize.value * scaledDensity
+                    typeface = resolvedTypeface
+                    isSubpixelText = true
+                    // StaticLayout computes each line's left edge from its own
+                    // Layout.Alignment. Paint must remain LEFT or CENTER/RIGHT
+                    // shifts the already-positioned line a second time.
+                    textAlign = Paint.Align.LEFT
                     if (text.shadowEnabled) {
                         setShadowLayer(
-                            text.shadowBlur.value * density * scaleX,
-                            text.shadowOffsetX.value * density * scaleX,
-                            text.shadowOffsetY.value * density * scaleY,
+                            text.shadowBlur.value * density,
+                            text.shadowOffsetX.value * density,
+                            text.shadowOffsetY.value * density,
                             text.shadowColor.copy(alpha = text.alpha).toArgb()
                         )
                     }
                 }
 
-                // Dimensions in display/screen space (before any saves to disk scaling)
-                val unscaledTextWidth = textWidth  // Text width at base fontSize
-                val unscaledTotalTextHeight = totalTextHeight  // Total height of all lines
-                val unscaledLineHeight = lineHeight  // Height of one line
-                val unscaledBaselineOffset = baselineOffset  // Baseline offset
-                
-                // Calculate the center point of the text BEFORE scaling (for rotation center)
-                val unscaledCenterX = unscaledTextWidth / 2f
-                val unscaledCenterY = unscaledTotalTextHeight / 2f
-                
-                // Scale these to image coordinates for the rotation center
-                val scaledUnscaledCenterX = unscaledCenterX * scaleX
-                val scaledUnscaledCenterY = unscaledCenterY * scaleY
-                
-                // Calculate scaled dimensions for rotation center
-                // Apply only image scale (NOT user scale, that's done by canvas.scale())
-                val scaledTextWidth = unscaledTextWidth * scaleX
-                val scaledTotalTextHeight = unscaledTotalTextHeight * scaleY
-
-                // Calculate the line height in the final scaled space
-                val scaledLineHeight = unscaledLineHeight * scaleY
-                val scaledBaselineOffset = unscaledBaselineOffset * scaleY
-
-                // Log computed values for debugging alignment
-                println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-                println("🔎 MemeFileSaver TEXT DEBUG:")
-                println("  Text: '${text.text.take(30)}...'")
-                println("  Screen Position: (${text.position.x}, ${text.position.y})")
-                println("  Image Offset: (${imageOffsetX}, ${imageOffsetY})")
-                println("  Relative to Image: (${posRelativeToImage.x}, ${posRelativeToImage.y})")
-                println("  Scale Factors: scaleX=${scaleX}, scaleY=${scaleY}, userScale=${text.scale}")
-                println("  Scaled to Image: (${scaledX}, ${scaledY})")
-                println("  ⚠️ EXPECTED in editor: text box outer edge at (${text.position.x}, ${text.position.y})")
-                println("  ⚠️ ACTUAL in saved image: text content starts at (${scaledX}, ${scaledY})")
-                println("  User Scale: ${text.scale}x, Rotation: ${text.rotation}°")
-                println("  Display Font Size (base): ${textPaintForMeasure.textSize}px")
-                println("  Final Font Size (image scaled): ${textPaint.textSize}px")
-                println("  Text Dimensions (unscaled): ${unscaledTextWidth}x${unscaledTotalTextHeight}px")
-                println("  Text Dimensions (image scaled): ${scaledTextWidth}x${scaledTotalTextHeight}px")
-                println("  Unscaled Center: (${unscaledCenterX}, ${unscaledCenterY})")
-                println("  Image-Scaled Center for rotation: (${scaledUnscaledCenterX}, ${scaledUnscaledCenterY})")
-                println("  Lines: ${lines.size}, Max Width: ${maxTextWidthPx}px")
-                println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
-                // Draw text: translate -> rotate around center -> apply user scale
-                // This matches Compose's graphicsLayer behavior: translate, rotate around center, then scale around center
-                canvas.save()
-                // Translate to the text's position on the final image
-                canvas.translate(scaledX, scaledY)
-                // Rotate around the text's center point
-                canvas.rotate(text.rotation, scaledUnscaledCenterX, scaledUnscaledCenterY)
-                // Apply user's scale transformation around the center
-                canvas.scale(text.scale, text.scale, scaledUnscaledCenterX, scaledUnscaledCenterY)
-                
-                // Calculate X offset based on text alignment
-                // Paint.Align handles the positioning: LEFT draws from x, CENTER from x-width/2, RIGHT from x-width
-                // Use unscaled maxWidth since canvas.scale() will handle the actual scaling
-                val alignmentX = when (textPaint.textAlign) {
-                    Paint.Align.LEFT -> 0f
-                    Paint.Align.CENTER -> maxTextWidthPx * scaleX / 2f  // Center within max width (image scaled only)
-                    Paint.Align.RIGHT -> maxTextWidthPx * scaleX  // Right-align to max width (image scaled only)
-                    else -> 0f
+                val paddingPx = 8f * density
+                val contentWidthPx = if (text.measuredWidthPx > 0f) {
+                    (text.measuredWidthPx - (paddingPx * 2f)).roundToInt().coerceAtLeast(1)
+                } else {
+                    (text.maxWidth.value * density).roundToInt().coerceAtLeast(1)
                 }
-                
-                // Draw outline if configured
+                val layoutAlignment = when (text.textAlign) {
+                    androidx.compose.ui.text.style.TextAlign.Center -> Layout.Alignment.ALIGN_CENTER
+                    androidx.compose.ui.text.style.TextAlign.Right,
+                    androidx.compose.ui.text.style.TextAlign.End -> Layout.Alignment.ALIGN_OPPOSITE
+                    else -> Layout.Alignment.ALIGN_NORMAL
+                }
+
+                val textLayout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    StaticLayout.Builder.obtain(text.text, 0, text.text.length, textPaint, contentWidthPx)
+                        .setAlignment(layoutAlignment)
+                        .setLineSpacing(0f, 1f)
+                        .setIncludePad(false)
+                        .setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE)
+                        .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
+                        .build()
+                } else {
+                    @Suppress("DEPRECATION")
+                    StaticLayout(
+                        text.text,
+                        textPaint,
+                        contentWidthPx,
+                        layoutAlignment,
+                        1f,
+                        0f,
+                        false
+                    )
+                }
+
+                // Compose permits the outline and shadow to paint outside the Box.
+                // Capture that overflow while retaining the Box's (0, 0) transform
+                // origin, so a rotated text layer stays attached to the same point.
+                val outlineOverflow = if (text.outlineWidth > 0.dp) {
+                    text.outlineWidth.value * density / 2f
+                } else {
+                    0f
+                }
+                val shadowOverflow = if (text.shadowEnabled) {
+                    text.shadowBlur.value * density + max(
+                        kotlin.math.abs(text.shadowOffsetX.value * density),
+                        kotlin.math.abs(text.shadowOffsetY.value * density)
+                    )
+                } else {
+                    0f
+                }
+                val overflow = max(outlineOverflow, shadowOverflow)
+                val localLeft = minOf(0f, paddingPx - overflow)
+                val localTop = minOf(0f, paddingPx - overflow)
+                val localRight = textLayout.width + (paddingPx * 2f) + overflow
+                val localBottom = textLayout.height + (paddingPx * 2f) + overflow
+                val bitmapWidth = (localRight - localLeft).roundToInt().coerceAtLeast(1)
+                val bitmapHeight = (localBottom - localTop).roundToInt().coerceAtLeast(1)
+
+                val textBitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
+                val textCanvas = Canvas(textBitmap)
+                val contentX = paddingPx - localLeft
+                val contentY = paddingPx - localTop
                 if (text.outlineWidth > 0.dp) {
-                    // Outline width is scaled by image scale (user scale will be applied by canvas.scale())
-                    val outlineWidthPx = text.outlineWidth.value * density * scaleX
-                    val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = text.outlineColor.copy(alpha = text.alpha).toArgb()
-                        textSize = textPaint.textSize
-                        textAlign = textPaint.textAlign
-                        style = Paint.Style.FILL
-                        typeface = selectedTypeface  // CRITICAL: Apply the SAME font as main text
-                        isFakeBoldText = text.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold
-                        if (text.shadowEnabled) {
-                            setShadowLayer(
-                                text.shadowBlur.value * density * scaleX,
-                                text.shadowOffsetX.value * density * scaleX,
-                                text.shadowOffsetY.value * density * scaleY,
-                                text.shadowColor.copy(alpha = text.alpha).toArgb()
-                            )
-                        }
-                    }
-                    
-                    // Draw outline text multiple times with offset
+                    val outlineOffset = outlineOverflow
+                    textPaint.color = text.outlineColor.copy(alpha = text.alpha).toArgb()
                     for (offsetX in -1..1) {
                         for (offsetY in -1..1) {
                             if (offsetX != 0 || offsetY != 0) {
-                                val outlineOffsetX = offsetX * (outlineWidthPx / 2f)
-                                val outlineOffsetY = offsetY * (outlineWidthPx / 2f)
-                                lines.forEachIndexed { lineIndex, line ->
-                                    val lineY = lineIndex * scaledLineHeight + scaledBaselineOffset
-                                    canvas.drawText(line, alignmentX + outlineOffsetX, lineY + outlineOffsetY, outlinePaint)
-                                }
+                                textCanvas.save()
+                                textCanvas.translate(
+                                    contentX + (offsetX * outlineOffset),
+                                    contentY + (offsetY * outlineOffset)
+                                )
+                                textLayout.draw(textCanvas)
+                                textCanvas.restore()
                             }
                         }
                     }
                 }
-                
-                // Draw each line using the final paint (with alignment)
-                lines.forEachIndexed { lineIndex, line ->
-                    val lineY = lineIndex * scaledLineHeight + scaledBaselineOffset
-                    canvas.drawText(line, alignmentX, lineY, textPaint)
+                textPaint.color = text.color.copy(alpha = text.alpha).toArgb()
+                textCanvas.save()
+                textCanvas.translate(contentX, contentY)
+                textLayout.draw(textCanvas)
+                textCanvas.restore()
+
+                canvas.save()
+                canvas.translate(
+                    text.position.x.roundToInt().toFloat(),
+                    text.position.y.roundToInt().toFloat()
+                )
+                if (text.rotation != 0f) canvas.rotate(text.rotation)
+                canvas.scale(text.scale, text.scale)
+                canvas.drawBitmap(textBitmap, localLeft, localTop, paint)
+                canvas.restore()
+
+                textBitmap.recycle()
+            }
+            canvas.restore()
+
+            // Draw small rounded watermark (app icon) at bottom-right
+            try {
+                val res = context.resources
+                val pkg = context.packageName
+                // Prefer round launcher icon if available
+                var logoResId = res.getIdentifier("ic_launcher_round", "mipmap", pkg)
+                if (logoResId == 0) {
+                    logoResId = res.getIdentifier("ic_launcher", "mipmap", pkg)
                 }
-                
-                canvas.restore()  // Restore canvas state (removes translate + rotate + scale)
+                // Try decoding resource; if that fails, attempt to get application icon drawable
+                var logoBmp: Bitmap? = null
+                if (logoResId != 0) {
+                    logoBmp = try {
+                        android.graphics.BitmapFactory.decodeResource(res, logoResId)
+                    } catch (_: Exception) { null }
+                }
+
+                if (logoBmp == null) {
+                    try {
+                        val appIcon = context.packageManager.getApplicationIcon(pkg)
+                        logoBmp = drawableToBitmap(appIcon)
+                    } catch (_: Exception) {
+                        logoBmp = null
+                    }
+                }
+
+                if (logoBmp != null) {
+                    // Watermark size ~8% of image width, margin ~3%
+                    val wmSize = (baseWidth * 0.08f).toInt().coerceAtLeast(24)
+                    val margin = (baseWidth * 0.03f)
+                    val scaledLogo = Bitmap.createScaledBitmap(logoBmp, wmSize, wmSize, true)
+                    val rounded = createRoundedBitmap(scaledLogo, (wmSize / 2))
+
+                    // Label text to the left of the logo
+                    val label = "Made with"
+                    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.WHITE
+                        alpha = (0.9f * 255).toInt()
+                        textSize = wmSize * 0.33f
+                        typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+                        setShadowLayer(2f, 0f, 0f, android.graphics.Color.BLACK)
+                    }
+                    val labelWidth = labelPaint.measureText(label)
+                    val spacing = (wmSize * 0.25f)
+                    val totalWidth = labelWidth + spacing + wmSize
+
+                    // Position at bottom-right inside image bounds
+                    val posX = (baseWidth - totalWidth - margin).toFloat().coerceAtLeast(0f)
+                    val iconX = posX + labelWidth + spacing
+                    val posY = (baseHeight - wmSize - margin).toFloat().coerceAtLeast(0f)
+                    val textBaseline = posY + wmSize - ((wmSize - labelPaint.textSize) / 2f)
+
+                    // Draw the label text and logo icon
+                    canvas.drawText(label, posX, textBaseline, labelPaint)
+                    val wmPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+                    wmPaint.alpha = (0.8f * 255).toInt()
+                    canvas.drawBitmap(rounded, iconX, posY, wmPaint)
+
+                    rounded.recycle()
+                    scaledLogo.recycle()
+                    logoBmp.recycle()
+                }
+            } catch (e: Exception) {
+                SecureLog.e("MemeFileSaver: Failed to draw watermark", e)
             }
 
             // Save to device using scoped storage (Android 10+) or legacy storage (pre-Android 10)
@@ -545,5 +511,19 @@ object MemeFileSaver {
         canvas.drawBitmap(bitmap, 0f, 0f, paint)
         
         return output
+    }
+
+    private fun drawableToBitmap(drawable: android.graphics.drawable.Drawable): Bitmap {
+        if (drawable is android.graphics.drawable.BitmapDrawable) {
+            drawable.bitmap?.let { return it.copy(it.config ?: Bitmap.Config.ARGB_8888, true) }
+        }
+
+        val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 48
+        val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 48
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
     }
 }
