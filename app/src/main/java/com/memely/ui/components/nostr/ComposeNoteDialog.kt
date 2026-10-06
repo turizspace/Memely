@@ -34,6 +34,7 @@ fun ComposeNoteDialog(
     imageUrl: String,
     initialCaption: String = "",
     isPosting: Boolean = false,
+    errorMessage: String? = null,
     onDismiss: () -> Unit,
     onPost: (caption: String) -> Unit
 ) {
@@ -121,6 +122,15 @@ fun ComposeNoteDialog(
                         maxLines = 5,
                         enabled = !isPosting
                     )
+
+                    if (!errorMessage.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = errorMessage,
+                            style = MaterialTheme.typography.caption,
+                            color = MaterialTheme.colors.error
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
 

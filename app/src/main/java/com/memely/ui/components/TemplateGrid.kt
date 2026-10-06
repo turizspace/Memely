@@ -29,6 +29,7 @@ fun TemplateGrid(
     error: String?,
     modifier: Modifier = Modifier,
     onTemplateClick: (MemeTemplate) -> Unit,
+    onShare: ((MemeTemplate) -> Unit)? = null,
     onFavoriteChanged: () -> Unit = {},
     gridState: LazyGridState = rememberLazyGridState(
         initialFirstVisibleItemIndex = TemplateGridScrollState.getSavedScrollIndex(),
@@ -118,7 +119,8 @@ fun TemplateGrid(
                             onClick = onTemplateClick,
                             onFavoriteToggle = { _, _ ->
                                 onFavoriteChanged()
-                            }
+                            },
+                            onShare = onShare
                         )
                     }
                 }

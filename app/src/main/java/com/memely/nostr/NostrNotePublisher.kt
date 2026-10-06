@@ -16,6 +16,13 @@ interface NostrNotePublisher {
         pubkeyHex: String,
         privKeyBytes: ByteArray
     ): PublishedNote
+
+    suspend fun publishNote(
+        content: String,
+        imageUrl: String,
+        pubkeyHex: String,
+        signEvent: suspend (String) -> String
+    ): PublishedNote
 }
 
 class DefaultNostrNotePublisher : NostrNotePublisher {
@@ -24,7 +31,16 @@ class DefaultNostrNotePublisher : NostrNotePublisher {
         imageUrl: String,
         pubkeyHex: String,
         privKeyBytes: ByteArray
-    ): PublishedNote = withContext(Dispatchers.IO) {
+    ): PublishedNote = publishNote(content, imageUrl, pubkeyHex) { eventJson ->
+        NostrEventSigner.signEventJson(eventJson, privKeyBytes)
+    }
+
+    override suspend fun publishNote(
+        content: String,
+        imageUrl: String,
+        pubkeyHex: String,
+        signEvent: suspend (String) -> String
+    ): PublishedNote {
         val fullContent = if (content.isNotBlank()) {
             "$content\n\n$imageUrl"
         } else {
@@ -39,22 +55,35 @@ class DefaultNostrNotePublisher : NostrNotePublisher {
             listOf("t", "memely")
         )
 
-        val signedEventJson = NostrEventSigner.signEvent(
-            kind = 1,
-            content = fullContent,
-            tags = tags,
-            pubkeyHex = pubkeyHex,
-            privKeyBytes = privKeyBytes
-        )
+        val unsignedEvent = JSONObject().apply {
+            put("kind", 1)
+            put("created_at", System.currentTimeMillis() / 1000L)
+            put("tags", org.json.JSONArray(tags.map { org.json.JSONArray(it) }))
+            put("content", fullContent)
+            put("pubkey", pubkeyHex)
+        }.toString()
+        val signedEventJson = signEvent(unsignedEvent)
+        val signedEvent = JSONObject(signedEventJson)
+        require(signedEvent.optInt("kind") == 1) { "Signer returned an event with the wrong kind" }
+        require(signedEvent.optString("pubkey").equals(pubkeyHex, ignoreCase = true)) {
+            "Signer returned an event for a different public key"
+        }
+        require(signedEvent.optString("id").equals(
+            NostrEventSigner.calculateEventId(signedEventJson),
+            ignoreCase = true
+        )) { "Signer returned an event with an invalid ID" }
+        require(signedEvent.optString("sig").matches(Regex("[0-9a-fA-F]{128}"))) {
+            "Signer returned an event without a valid signature"
+        }
 
-        val eventId = JSONObject(signedEventJson).getString("id")
-        RelayEventTracker.initializeEventTracking(eventId, NostrRepository.relayPool.getCurrentRelays())
+        val eventId = signedEvent.getString("id")
+        withContext(Dispatchers.IO) {
+            RelayEventTracker.initializeEventTracking(eventId, NostrRepository.relayPool.getCurrentRelays())
 
-        SecureLog.d("NostrNotePublisher: Publishing note ${SecureLog.truncateHex(eventId)} using optimized posting manager")
-        
-        // Use the new PostingManager for intelligent retry and poor connection handling
-        NostrRepository.publishEvent("""["EVENT",$signedEventJson]""")
+            SecureLog.d("NostrNotePublisher: Publishing note ${SecureLog.truncateHex(eventId)} using optimized posting manager")
 
-        PublishedNote(eventId = eventId)
+            NostrRepository.publishEvent("""["EVENT",$signedEventJson]""")
+        }
+        return PublishedNote(eventId = eventId)
     }
 }

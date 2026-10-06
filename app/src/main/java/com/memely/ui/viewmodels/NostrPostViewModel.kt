@@ -84,6 +84,33 @@ class NostrPostViewModel(
         }
     }
 
+    fun publishNote(
+        content: String,
+        imageUrl: String,
+        pubkeyHex: String,
+        signEvent: suspend (String) -> String,
+        onSuccess: ((String) -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            _postState.value = PostState.Posting
+            runCatching {
+                notePublisher.publishNote(
+                    content = content,
+                    imageUrl = imageUrl,
+                    pubkeyHex = pubkeyHex,
+                    signEvent = signEvent
+                )
+            }.onSuccess { publishedNote ->
+                SecureLog.d("NostrPostViewModel: Published note ${SecureLog.truncateHex(publishedNote.eventId)}")
+                _postState.value = PostState.Success(publishedNote.eventId)
+                onSuccess?.invoke(publishedNote.eventId)
+            }.onFailure { throwable ->
+                SecureLog.e("NostrPostViewModel: Failed to publish note", throwable)
+                _postState.value = PostState.Error("Error: ${throwable.message}")
+            }
+        }
+    }
+
     fun reset() {
         _postState.value = PostState.Idle
     }

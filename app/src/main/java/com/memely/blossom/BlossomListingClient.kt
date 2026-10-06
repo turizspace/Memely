@@ -2,6 +2,8 @@ package com.memely.blossom
 
 import android.util.Base64
 import com.memely.network.SecureHttpClient
+import com.memely.nostr.NostrEventSigner
+import com.memely.util.SecureLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -25,33 +27,83 @@ class BlossomListingClient {
         serverUrl: String,
         pubkey: String,
         signEvent: suspend (String) -> String
-    ): List<BlobDescriptor> = withContext(Dispatchers.IO) {
+    ): List<BlobDescriptor> {
         require(pubkey.matches(Regex("[0-9a-fA-F]{64}"))) { "Invalid public key" }
+        val normalizedPubkey = pubkey.lowercase()
         val base = serverUrl.trimEnd('/')
         require(base.toHttpUrlOrNull()?.isHttps == true) { "Blossom server must use HTTPS" }
+        SecureLog.d(
+            "BlossomListingClient: Preparing authenticated GET $base/list/${normalizedPubkey.take(8)}…"
+        )
+        val now = System.currentTimeMillis() / 1000L
 
         val unsignedEvent = JSONObject().apply {
             put("kind", 24242)
-            put("created_at", System.currentTimeMillis() / 1000L)
-            put("pubkey", pubkey)
+            put("created_at", now)
+            put("pubkey", normalizedPubkey)
             put("content", "")
             put("tags", JSONArray().put(JSONArray(listOf("t", "list"))).put(
-                JSONArray(listOf("expiration", ((System.currentTimeMillis() / 1000L) + 300L).toString()))
+                JSONArray(listOf("expiration", (now + 300L).toString()))
             ))
         }.toString()
+        SecureLog.d("BlossomListingClient: Requesting kind-24242 list authorization signature")
         val signedEvent = signEvent(unsignedEvent)
+        val signed = JSONObject(signedEvent)
+        require(signed.optInt("kind") == 24242) { "Signer returned an event with the wrong kind" }
+        require(signed.optString("pubkey").equals(normalizedPubkey, ignoreCase = true)) {
+            "Signer returned an event for a different public key"
+        }
+        require(signed.optString("sig").matches(Regex("[0-9a-fA-F]{128}"))) {
+            "Signer returned an event without a valid signature shape"
+        }
+        val signedId = signed.optString("id")
+        require(signedId.matches(Regex("[0-9a-fA-F]{64}")) &&
+            signedId.equals(NostrEventSigner.calculateEventId(signedEvent), ignoreCase = true)
+        ) {
+            "Signer returned an event with an invalid ID"
+        }
+        val signedTags = signed.optJSONArray("tags")
+            ?: throw IllegalArgumentException("Signer returned an event without authorization tags")
+        val hasListPermission = (0 until signedTags.length()).any { index ->
+            val tag = signedTags.optJSONArray(index)
+            tag != null && tag.length() >= 2 && tag.optString(0) == "t" && tag.optString(1) == "list"
+        }
+        require(hasListPermission) { "Signer returned an event without list permission" }
+        val expiry = (0 until signedTags.length()).mapNotNull { index ->
+            val tag = signedTags.optJSONArray(index)
+            if (tag != null && tag.length() >= 2 && tag.optString(0) == "expiration") {
+                tag.optString(1).toLongOrNull()
+            } else null
+        }.minOrNull()
+        require(expiry != null && expiry > System.currentTimeMillis() / 1000L) {
+            "Signer returned an expired or non-expiring authorization"
+        }
+        SecureLog.d("BlossomListingClient: Authorization signed for ${normalizedPubkey.take(8)}")
         val authorization = "Nostr " + Base64.encodeToString(
             signedEvent.toByteArray(Charsets.UTF_8), Base64.NO_WRAP
         )
         val request = Request.Builder()
-            .url("$base/list/$pubkey")
+            .url("$base/list/$normalizedPubkey")
             .header("Authorization", authorization)
             .get()
             .build()
 
-        http.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IllegalStateException("Server returned HTTP ${response.code}")
-            parseDescriptors(response.body?.string().orEmpty())
+        return withContext(Dispatchers.IO) {
+            http.newCall(request).execute().use { response ->
+                SecureLog.i(
+                    "BlossomListingClient: GET /list/${normalizedPubkey.take(8)}… returned HTTP ${response.code}"
+                )
+                if (!response.isSuccessful) {
+                    throw IllegalStateException("Blossom server returned HTTP ${response.code}")
+                }
+                val body = response.body?.string().orEmpty()
+                val descriptors = parseDescriptors(body)
+                SecureLog.i(
+                    "BlossomListingClient: Parsed ${descriptors.size} valid unique descriptors " +
+                        "from ${body.length} response characters"
+                )
+                descriptors
+            }
         }
     }
 

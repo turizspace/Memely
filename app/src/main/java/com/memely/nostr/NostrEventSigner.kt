@@ -21,13 +21,12 @@ object NostrEventSigner {
         content: String,
         tags: List<List<String>>,
         pubkeyHex: String,
-        privKeyBytes: ByteArray
+        privKeyBytes: ByteArray,
+        createdAt: Long = System.currentTimeMillis() / 1000L
     ): String {
         require(privKeyBytes.size == 32) { "Private key must be 32 bytes" }
         
         println("🔏 NostrEventSigner.signEvent: Signing with nsec - pubkey=${pubkeyHex.take(8)}..., kind=$kind")
-        
-        val createdAt = System.currentTimeMillis() / 1000L
         
         // Build event serialization for hashing according to NIP-01
         // Format: [0, pubkey, created_at, kind, tags, content]
@@ -58,6 +57,24 @@ object NostrEventSigner {
             put("content", content)
             put("sig", signature)
         }.toString()
+    }
+
+    fun signEventJson(eventJson: String, privKeyBytes: ByteArray): String {
+        val event = JSONObject(eventJson)
+        val tags = event.getJSONArray("tags").let { array ->
+            (0 until array.length()).map { i ->
+                val tag = array.getJSONArray(i)
+                (0 until tag.length()).map { j -> tag.getString(j) }
+            }
+        }
+        return signEvent(
+            kind = event.getInt("kind"),
+            content = event.optString("content"),
+            tags = tags,
+            pubkeyHex = event.getString("pubkey"),
+            privKeyBytes = privKeyBytes,
+            createdAt = event.getLong("created_at")
+        )
     }
 
     /**

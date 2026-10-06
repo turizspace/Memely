@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.*
 import coil.compose.AsyncImage
 import com.memely.ui.components.nostr.ComposeNoteDialog
 import com.memely.ui.components.nostr.RelayStatusDialog
+import com.memely.blossom.signBlossomAuthorization
 import com.memely.ui.viewmodels.BlossomUploadViewModel
 import com.memely.ui.viewmodels.NostrPostViewModel
 import com.memely.nostr.KeyStoreManager
@@ -934,32 +935,6 @@ fun MemeEditorScreen(
             }
         )
     }
-}
-
-/** Signs as the active identity, delegating to Amber when that is the active signer. */
-private suspend fun signBlossomAuthorization(eventJson: String, pubkey: String): String {
-    val eventId = NostrEventSigner.calculateEventId(eventJson)
-    val eventWithId = org.json.JSONObject(eventJson).apply { put("id", eventId) }.toString()
-    if (KeyStoreManager.isUsingAmber()) {
-        val packageName = KeyStoreManager.getAmberPackageName()
-            ?: throw IllegalStateException("No external signer is configured")
-        AmberSignerManager.configure(pubkey, packageName)
-        return AmberSignerManager.signEvent(eventWithId, eventId).event
-            ?: throw IllegalStateException("External signer did not return a signed event")
-    }
-    val privateKey = KeyStoreManager.exportNsecHex()
-        ?: throw IllegalStateException("No local signing key is available")
-    val json = org.json.JSONObject(eventJson)
-    val tags = json.getJSONArray("tags").let { array ->
-        (0 until array.length()).map { i ->
-            val tag = array.getJSONArray(i)
-            (0 until tag.length()).map { j -> tag.getString(j) }
-        }
-    }
-    return NostrEventSigner.signEvent(
-        kind = json.getInt("kind"), content = json.optString("content"), tags = tags,
-        pubkeyHex = pubkey, privKeyBytes = privateKey.hexToBytes()
-    )
 }
 
 // Helper extension to convert hex string to bytes

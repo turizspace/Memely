@@ -35,7 +35,10 @@ fun RelayStatusDialog(
     publishResult: PublishResult?,
     onDismiss: () -> Unit,
     onRetry: (() -> Unit)? = null,
-    onExitEditor: () -> Unit = {}
+    onExitEditor: () -> Unit = {},
+    title: String = "Relay Status",
+    dismissLabel: String = "Keep Editing",
+    doneLabel: String = "Done"
 ) {
     if (publishResult == null) return
 
@@ -62,7 +65,7 @@ fun RelayStatusDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Relay Status",
+                        text = title,
                         style = MaterialTheme.typography.h6,
                         fontWeight = FontWeight.Bold
                     )
@@ -155,7 +158,7 @@ fun RelayStatusDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Keep Editing")
+                        Text(dismissLabel)
                     }
                     
                     if (showRetryButton && onRetry != null) {
@@ -195,7 +198,7 @@ fun RelayStatusDialog(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Done")
+                        Text(doneLabel)
                     }
                 }
             }

@@ -11,6 +11,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.runtime.*
@@ -34,6 +35,7 @@ fun TemplateCard(
     modifier: Modifier = Modifier,
     isFavorite: Boolean = false,
     onFavoriteToggle: (String, Boolean) -> Unit = { _, _ -> },
+    onShare: ((MemeTemplate) -> Unit)? = null,
     onClick: (MemeTemplate) -> Unit
 ) {
     val context = LocalContext.current
@@ -116,6 +118,21 @@ fun TemplateCard(
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
                         )
+                    }
+
+                    if (onShare != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(
+                            onClick = { onShare(template) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share media",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                     
                     Spacer(modifier = Modifier.width(4.dp))

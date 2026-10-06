@@ -4,12 +4,10 @@ import android.content.Context
 import com.memely.blossom.BlossomConfig
 import com.memely.blossom.BlossomListingClient
 import com.memely.util.SecureLog
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 
 data class MemeTemplate(
     val name: String,
@@ -88,40 +86,54 @@ object TemplateRepository {
     ) {
         fetchMutex.withLock {
             if (_isLoadingFlow.value) {
+                SecureLog.w("TemplateRepository: Skipping fetch; another Blossom request is loading")
                 return
             }
             if (!forceRefresh && loadedForPubkey == pubkey && _templatesFlow.value.isNotEmpty()) {
+                SecureLog.d(
+                    "TemplateRepository: Using ${_templatesFlow.value.size} cached blobs for ${pubkey.take(8)}"
+                )
                 return
             }
 
+            SecureLog.i(
+                "TemplateRepository: Fetching Blossom media for ${pubkey.take(8)} from $serverUrl " +
+                    "(forceRefresh=$forceRefresh)"
+            )
             // Results are identity-scoped. Never show a previous account's media while loading.
             if (loadedForPubkey != pubkey) {
                 _templatesFlow.value = emptyList()
                 loadedForPubkey = null
+                SecureLog.d("TemplateRepository: Cleared templates belonging to a different identity")
             }
 
             _isLoadingFlow.value = true
             _errorFlow.value = null
 
             try {
-                val templates = withContext(Dispatchers.IO) {
-                    blossomListingClient.listFiles(serverUrl, pubkey, signEvent)
-                        .filter { it.mimeType.startsWith("image/", ignoreCase = true) }
-                        .map { blob ->
-                            MemeTemplate(
-                                name = "Blossom ${blob.sha256.take(12)}",
-                                url = blob.url,
-                                size = blob.size,
-                                mimeType = blob.mimeType
-                            )
-                        }
+                val blobs = blossomListingClient.listFiles(serverUrl, pubkey, signEvent)
+                val images = blobs.filter { it.mimeType.startsWith("image/", ignoreCase = true) }
+                SecureLog.i(
+                    "TemplateRepository: Blossom list returned ${blobs.size} valid blobs; " +
+                        "${images.size} are images"
+                )
+                val templates = images.map { blob ->
+                    MemeTemplate(
+                        name = "Blossom ${blob.sha256.take(12)}",
+                        url = blob.url,
+                        size = blob.size,
+                        mimeType = blob.mimeType
+                    )
                 }
 
                 _templatesFlow.value = templates
                 loadedForPubkey = pubkey
-                SecureLog.i("TemplateRepository: Loaded ${templates.size} templates")
+                SecureLog.i(
+                    "TemplateRepository: Published ${templates.size} image templates for ${pubkey.take(8)}"
+                )
             } catch (e: Exception) {
-                val errorMsg = "Failed to load your Blossom media: ${e.message}"
+                val errorMsg =
+                    "Failed to load Blossom media for ${pubkey.take(8)} from $serverUrl: ${e.message}"
                 _errorFlow.value = errorMsg
                 SecureLog.e("TemplateRepository: $errorMsg", e)
             } finally {

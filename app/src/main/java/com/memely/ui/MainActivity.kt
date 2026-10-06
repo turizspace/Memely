@@ -388,6 +388,7 @@ fun AuthenticatedRoot(
         ) {
             composable("home") {
                 HomeFeedScreen(
+                    pubkeyHex = pubkeyHex,
                     onTemplateSelected = { uri ->
                         // Store URI in shared state and navigate to editor
                         selectedImageUri = uri
