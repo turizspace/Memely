@@ -52,11 +52,9 @@ fun HomeFeedScreen(
         }
     }
     
-    // Fetch templates on first composition
+    // Blossom media is identity-bound and is fetched from the editor after its signer is available.
     LaunchedEffect(Unit) {
-        println("📡 HomeFeedScreen: Fetching meme templates...")
         FavoritesManager.initialize(context)  // Initialize favorites from storage
-        TemplateRepository.fetchTemplates()
     }
     
     // Reset scroll position when switching tabs

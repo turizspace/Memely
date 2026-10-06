@@ -1,7 +1,8 @@
 package com.memely.data
 
 import android.content.Context
-import com.memely.network.SecureHttpClient
+import com.memely.blossom.BlossomConfig
+import com.memely.blossom.BlossomListingClient
 import com.memely.util.SecureLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,9 +10,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.Request
-import org.json.JSONObject
-import com.memely.nostr.Constants
 
 data class MemeTemplate(
     val name: String,
@@ -23,7 +21,7 @@ data class MemeTemplate(
 )
 
 object TemplateRepository {
-    private val httpClient = SecureHttpClient.createDownloadClient()
+    private val blossomListingClient = BlossomListingClient()
     private val fetchMutex = Mutex()
     
     private val _templatesFlow = MutableStateFlow<List<MemeTemplate>>(emptyList())
@@ -34,6 +32,7 @@ object TemplateRepository {
     
     private val _errorFlow = MutableStateFlow<String?>(null)
     val errorFlow: StateFlow<String?> = _errorFlow
+    private var loadedForPubkey: String? = null
     
     /**
      * Search/filter templates by name
@@ -77,13 +76,28 @@ object TemplateRepository {
         }
     }
     
-    suspend fun fetchTemplates(forceRefresh: Boolean = false) {
+    /**
+     * Loads image blobs owned by the active Nostr identity from its configured Blossom server.
+     * The caller supplies signing so external signers never require exporting an nsec.
+     */
+    suspend fun fetchTemplates(
+        pubkey: String,
+        signEvent: suspend (String) -> String,
+        forceRefresh: Boolean = false,
+        serverUrl: String = BlossomConfig.baseUrl
+    ) {
         fetchMutex.withLock {
             if (_isLoadingFlow.value) {
                 return
             }
-            if (!forceRefresh && _templatesFlow.value.isNotEmpty()) {
+            if (!forceRefresh && loadedForPubkey == pubkey && _templatesFlow.value.isNotEmpty()) {
                 return
+            }
+
+            // Results are identity-scoped. Never show a previous account's media while loading.
+            if (loadedForPubkey != pubkey) {
+                _templatesFlow.value = emptyList()
+                loadedForPubkey = null
             }
 
             _isLoadingFlow.value = true
@@ -91,52 +105,23 @@ object TemplateRepository {
 
             try {
                 val templates = withContext(Dispatchers.IO) {
-                    val request = Request.Builder()
-                        .url(Constants.MEME_TEMPLATES_API)
-                        .build()
-
-                    httpClient.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) {
-                            throw Exception("API error: ${response.code}")
+                    blossomListingClient.listFiles(serverUrl, pubkey, signEvent)
+                        .filter { it.mimeType.startsWith("image/", ignoreCase = true) }
+                        .map { blob ->
+                            MemeTemplate(
+                                name = "Blossom ${blob.sha256.take(12)}",
+                                url = blob.url,
+                                size = blob.size,
+                                mimeType = blob.mimeType
+                            )
                         }
-
-                        val body = response.body?.string() ?: "{}"
-                        val json = JSONObject(body)
-                        if (!json.optBoolean("success", false)) {
-                            throw Exception("API returned success=false")
-                        }
-
-                        val templatesArray = json.optJSONArray("templates") ?: org.json.JSONArray()
-                        buildList {
-                            for (i in 0 until templatesArray.length()) {
-                                val templateObj = templatesArray.getJSONObject(i)
-                                val rawUrl = templateObj.optString("url", "").trim()
-                                if (rawUrl.isBlank()) {
-                                    continue
-                                }
-
-                                val widthValue = if (templateObj.has("width")) templateObj.getInt("width") else null
-                                val heightValue = if (templateObj.has("height")) templateObj.getInt("height") else null
-
-                                add(
-                                    MemeTemplate(
-                                        name = templateObj.optString("name", "Unknown").trim().ifBlank { "Unknown" },
-                                        url = rawUrl,
-                                        size = templateObj.optLong("size", 0),
-                                        width = widthValue,
-                                        height = heightValue,
-                                        mimeType = templateObj.optString("mime_type", "image/jpeg")
-                                    )
-                                )
-                            }
-                        }.distinctBy { it.url }
-                    }
                 }
 
                 _templatesFlow.value = templates
+                loadedForPubkey = pubkey
                 SecureLog.i("TemplateRepository: Loaded ${templates.size} templates")
             } catch (e: Exception) {
-                val errorMsg = "Failed to load templates: ${e.message}"
+                val errorMsg = "Failed to load your Blossom media: ${e.message}"
                 _errorFlow.value = errorMsg
                 SecureLog.e("TemplateRepository: $errorMsg", e)
             } finally {

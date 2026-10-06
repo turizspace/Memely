@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,11 +20,13 @@ import com.memely.ui.components.SearchBar
 import com.memely.ui.components.TemplateGrid
 import com.memely.ui.components.TemplateTab
 import com.memely.ui.components.TemplateTabBar
-import com.memely.nostr.Constants
+import kotlinx.coroutines.launch
 
 @Composable
 fun TemplateSelectorDialog(
     onDismiss: () -> Unit,
+    pubkey: String?,
+    signEvent: (suspend (String) -> String)?,
     onTemplateSelected: (Uri) -> Unit
 ) {
     val context = LocalContext.current
@@ -34,6 +37,7 @@ fun TemplateSelectorDialog(
     
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf(TemplateTab.ALL) }
+    val scope = rememberCoroutineScope()
     
     // Get templates based on selected tab - recomputes when favorites change
     val displayedTemplates = remember(templates, selectedTab, searchQuery, favorites) {
@@ -44,10 +48,9 @@ fun TemplateSelectorDialog(
     }
     
     // Fetch templates on first composition if not already loaded
-    LaunchedEffect(Unit) {
-        if (templates.isEmpty() && !isLoading) {
-            println("📡 TemplateSelectorDialog: Fetching meme templates...")
-            TemplateRepository.fetchTemplates()
+    LaunchedEffect(pubkey, signEvent) {
+        if (templates.isEmpty() && !isLoading && !pubkey.isNullOrBlank() && signEvent != null) {
+            TemplateRepository.fetchTemplates(pubkey, signEvent)
         }
         FavoritesManager.initialize(context)  // Initialize favorites from storage
     }
@@ -80,14 +83,23 @@ fun TemplateSelectorDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Add Template Layer",
+                        text = "Your Blossom media",
                         style = MaterialTheme.typography.h6
                     )
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close"
-                        )
+                    Row {
+                        IconButton(
+                            enabled = !isLoading && !pubkey.isNullOrBlank() && signEvent != null,
+                            onClick = {
+                                scope.launch {
+                                    TemplateRepository.fetchTemplates(pubkey!!, signEvent!!, forceRefresh = true)
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh Blossom media")
+                        }
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
                     }
                 }
 
@@ -111,20 +123,19 @@ fun TemplateSelectorDialog(
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
-                // Template grid
-                TemplateGrid(
-                    templates = displayedTemplates,
-                    isLoading = isLoading,
-                    error = error,
-                    modifier = Modifier.fillMaxSize(),
-                    onTemplateClick = { template ->
-                        println("🎨 TemplateSelectorDialog: Selected template - ${template.name}")
-                        
-                        // Convert template URL to Uri and pass to callback
-                        val templateUri = Uri.parse(Constants.getTemplateImageUrl(template.url))
-                        onTemplateSelected(templateUri)
+                if (pubkey.isNullOrBlank() || signEvent == null) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Sign in with a Nostr signer to browse your Blossom media.")
                     }
-                )
+                } else {
+                    TemplateGrid(
+                        templates = displayedTemplates,
+                        isLoading = isLoading,
+                        error = error,
+                        modifier = Modifier.fillMaxSize(),
+                        onTemplateClick = { template -> onTemplateSelected(Uri.parse(template.url)) }
+                    )
+                }
             }
         }
     }
