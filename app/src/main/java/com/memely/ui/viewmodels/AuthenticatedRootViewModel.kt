@@ -34,13 +34,16 @@ class AuthenticatedRootViewModel(
         sessionRepository.sessionState,
         profileRepository.connectedRelays,
         profileRepository.effectiveRelays,
-        profileRepository.userMetadata
-    ) { sessionState, connectedRelays, effectiveRelays, userMetadata ->
+        profileRepository.userMetadata,
+        profileRepository.userMetadataPubkey
+    ) { sessionState, connectedRelays, effectiveRelays, userMetadata, metadataPubkey ->
         AuthenticatedRootUiState(
             pubkeyHex = sessionState.pubkeyHex,
             connectedRelays = connectedRelays,
             totalRelays = effectiveRelays.size,
-            userMetadata = userMetadata
+            // The authenticated profile must only ever consume metadata tagged
+            // with the current session's pubkey.
+            userMetadata = userMetadata.takeIf { metadataPubkey == sessionState.pubkeyHex }
         )
     }.stateIn(
         scope = viewModelScope,
@@ -49,7 +52,9 @@ class AuthenticatedRootViewModel(
             pubkeyHex = sessionRepository.sessionState.value.pubkeyHex,
             connectedRelays = profileRepository.connectedRelays.value,
             totalRelays = profileRepository.effectiveRelays.value.size,
-            userMetadata = profileRepository.userMetadata.value
+            userMetadata = profileRepository.userMetadata.value.takeIf {
+                profileRepository.userMetadataPubkey.value == sessionRepository.sessionState.value.pubkeyHex
+            }
         )
     )
 

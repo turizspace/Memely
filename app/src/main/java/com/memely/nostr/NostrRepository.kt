@@ -21,11 +21,15 @@ object NostrRepository {
     
     private val _metadataState = MutableStateFlow<MetadataParser.UserMetadata?>(null)
     val metadataState: StateFlow<MetadataParser.UserMetadata?> = _metadataState.asStateFlow()
+    // This state is only for the signed-in account. Keep its owner alongside the
+    // data so callers can never render metadata that belongs to another pubkey.
+    private val _metadataStatePubkey = MutableStateFlow<String?>(null)
+    val metadataStatePubkey: StateFlow<String?> = _metadataStatePubkey.asStateFlow()
 
     private val _userRelaysState = MutableStateFlow<List<String>>(emptyList())
     val userRelaysState: StateFlow<List<String>> = _userRelaysState
 
-    private var isMetadataListenerActive = false
+    private var metadataListenerJob: Job? = null
     private var isRelayListenerActive = false
     private var hasRealMetadata = false
     private var isInitialConnectionDone = false
@@ -77,8 +81,6 @@ object NostrRepository {
                                 val parsedMetadata = parseMetadataFromMessage(msg, pubkey)
                                 if (parsedMetadata != null) {
                                     metadata = parsedMetadata
-                                    hasRealMetadata = true
-                                    _metadataState.value = parsedMetadata
                                     // CRITICAL: Cache metadata atomically only if newer (by created_at timestamp)
                                     UserMetadataCache.cacheMetadataIfNewer(pubkey, parsedMetadata)
                                     SecureLog.d("NostrRepository: Found metadata: ${parsedMetadata.name} (created_at: ${parsedMetadata.createdAt})")
@@ -112,14 +114,11 @@ object NostrRepository {
             SecureLog.w("NostrRepository: Timeout waiting for profile data from $pubkey")
         }
 
-        // ONLY create basic metadata if we never found real metadata
-        if (metadata == null && !hasRealMetadata) {
+        // Generic profile lookups must never fall back to the signed-in user's
+        // state. Explore and metadata refreshes use this path for other authors.
+        if (metadata == null) {
             metadata = createBasicMetadata()
-            _metadataState.value = metadata
-            SecureLog.d("NostrRepository: Created basic metadata for user (no real data found)")
-        } else if (metadata == null) {
-            SecureLog.d("NostrRepository: Using existing real metadata from continuous listener")
-            metadata = _metadataState.value
+            SecureLog.d("NostrRepository: Created basic metadata for requested profile (no real data found)")
         }
 
         // Log results
@@ -173,6 +172,7 @@ object NostrRepository {
         val cached = UserMetadataCache.getCachedMetadata(pubkey)
         if (cached != null && cached.name != "Anonymous" && cached.name != "Memely User") {
             _metadataState.value = cached
+            _metadataStatePubkey.value = pubkey
             hasRealMetadata = true
             SecureLog.d("NostrRepository: Warmed signed-in user metadata from cache")
             return cached
@@ -181,6 +181,7 @@ object NostrRepository {
         val metadata = fetchProfileMetadata(pubkey)
         if (metadata != null && metadata.name != "Anonymous") {
             _metadataState.value = metadata
+            _metadataStatePubkey.value = pubkey
             hasRealMetadata = true
             SecureLog.d("NostrRepository: Warmed signed-in user metadata from relays")
         }
@@ -383,10 +384,18 @@ object NostrRepository {
     }
 
     fun startMetadataListener(pubkey: String) {
-        if (isMetadataListenerActive) return
+        if (_metadataStatePubkey.value == pubkey && metadataListenerJob?.isActive == true) return
+
+        // The listener is account-scoped. Cancel the previous account listener
+        // before starting another so delayed events cannot replace this state.
+        metadataListenerJob?.cancel()
+
+        // A new authenticated session must not retain the previous account's
+        // identity while its metadata is loading.
+        _metadataState.value = null
+        _metadataStatePubkey.value = pubkey
         
-        scope.launch {
-            isMetadataListenerActive = true
+        metadataListenerJob = scope.launch {
             incomingMessagesFlow.collect { msg ->
                 try {
                     if (msg.contains("\"kind\":0") && msg.contains(pubkey)) {
@@ -394,6 +403,7 @@ object NostrRepository {
                         if (parsed != null) {
                             hasRealMetadata = true
                             _metadataState.value = parsed
+                            _metadataStatePubkey.value = pubkey
                             // Cache continuously received metadata atomically (only if newer)
                             UserMetadataCache.cacheMetadataIfNewer(pubkey, parsed)
                         }

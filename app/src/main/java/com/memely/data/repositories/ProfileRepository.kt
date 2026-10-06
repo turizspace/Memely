@@ -15,6 +15,7 @@ interface ProfileRepository {
     val connectedRelays: StateFlow<Int>
     val effectiveRelays: StateFlow<List<String>>
     val userMetadata: StateFlow<MetadataParser.UserMetadata?>
+    val userMetadataPubkey: StateFlow<String?>
 
     suspend fun connectAll()
 
@@ -35,6 +36,7 @@ class DefaultProfileRepository : ProfileRepository {
     override val connectedRelays: StateFlow<Int> = NostrRepository.connectedRelaysFlow
     override val effectiveRelays: StateFlow<List<String>> = RelayManager.effectiveRelays
     override val userMetadata: StateFlow<MetadataParser.UserMetadata?> = NostrRepository.metadataState
+    override val userMetadataPubkey: StateFlow<String?> = NostrRepository.metadataStatePubkey
 
     // In-memory profile cache - backed by persistent disk storage
     private val profileCache = ConcurrentHashMap<String, CachedProfile>()
