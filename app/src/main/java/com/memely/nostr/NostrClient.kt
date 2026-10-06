@@ -19,7 +19,7 @@ import kotlin.coroutines.resume
  */
 class NostrClient(private val relayUrl: String) {
     private var webSocket: WebSocket? = null
-    val incoming = Channel<String>(Channel.BUFFERED)
+    val incoming = Channel<String>(Channel.UNLIMITED)
     
     // Public accessor for relay URL
     val url: String get() = relayUrl
@@ -52,6 +52,10 @@ class NostrClient(private val relayUrl: String) {
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             }
         })
+        cont.invokeOnCancellation {
+            webSocket?.cancel()
+            incoming.cancel()
+        }
     }
 
     /**
@@ -105,6 +109,8 @@ class NostrClient(private val relayUrl: String) {
     suspend fun publish(rawEvent: String): Boolean {
         return webSocket?.send(rawEvent) ?: false
     }
+
+    fun publishNow(message: String): Boolean = webSocket?.send(message) ?: false
 
     fun close() {
         webSocket?.close(1000, "Closed")

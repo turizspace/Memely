@@ -1,13 +1,18 @@
 package com.memely.nostr
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicBoolean
+
+data class RelayIncomingMessage(val relayUrl: String, val raw: String)
 
 class RelayPool(
     private var relays: List<String> = emptyList()
@@ -15,115 +20,140 @@ class RelayPool(
     // Use a persistent coroutine scope that won't be cancelled
     private val connectionScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val clients = CopyOnWriteArrayList<NostrClient>()
+    private val relayMessageQueue = Channel<RelayIncomingMessage>(Channel.UNLIMITED)
+    private val rawMessageQueue = Channel<String>(Channel.UNLIMITED)
     private val _connectedRelaysFlow = MutableStateFlow(0)
     val connectedRelaysFlow: StateFlow<Int> get() = _connectedRelaysFlow
+    private val _connectionGenerationFlow = MutableStateFlow(0L)
+    val connectionGenerationFlow: StateFlow<Long> get() = _connectionGenerationFlow
     private val _incomingMessagesFlow = MutableSharedFlow<String>(extraBufferCapacity = 100)
     val incomingMessagesFlow: SharedFlow<String> get() = _incomingMessagesFlow
+    private val _relayMessagesFlow = MutableSharedFlow<RelayIncomingMessage>(extraBufferCapacity = 1000)
+    val relayMessagesFlow: SharedFlow<RelayIncomingMessage> get() = _relayMessagesFlow
     private val successful = AtomicInteger(0)
-    
-    // Use AtomicBoolean for thread-safe connection state tracking
-    private val isConnecting = AtomicBoolean(false)
+    private val connectedRelayUrls = ConcurrentHashMap.newKeySet<String>()
+    private val activeSubscriptions = ConcurrentHashMap<String, String>()
+    private val connectionMutex = Mutex()
 
-    suspend fun connectAll() = withContext(connectionScope.coroutineContext) {
-        if (relays.isEmpty()) {
-            return@withContext
+    init {
+        connectionScope.launch {
+            for (message in relayMessageQueue) _relayMessagesFlow.emit(message)
         }
-        
-        // Atomic compare-and-set: Only proceed if we can transition from false -> true
-        if (!isConnecting.compareAndSet(false, true)) {
-            println("🔗 RelayPool: Connection already in progress, skipping duplicate attempt")
-            return@withContext
-        }
-        
-        try {
-            // Reset counters for fresh connection attempt
-            successful.set(0)
-            clients.clear()
-            
-            val connectionJobs = relays.map { url ->
-                connectionScope.launch {
-                    try {
-                        val client = NostrClient(url)
-                        clients += client
-                        val ok = client.connect()
-                        if (ok) {
-                            successful.incrementAndGet()
-                            // Do NOT update flow during cascade - only at the end
-                            
-                            // Start listening for messages
-                            launch {
-                                try {
-                                    for (msg in client.incoming) {
-                                        _incomingMessagesFlow.emit(msg)
-                                    }
-                                } catch (e: Exception) {
-                                }
-                            }
-                        } else {
-                            clients.remove(client)
-                        }
-                    } catch (e: Exception) {
-                    }
-                }
-            }
-            
-            // Wait for all connection attempts with timeout
-            try {
-                withTimeout(15000) {
-                    connectionJobs.forEach { it.join() }
-                }
-            } catch (e: TimeoutCancellationException) {
-            }
-            
-            // UPDATE ONCE after all connections complete - single atomic state update
-            val finalCount = successful.get()
-            _connectedRelaysFlow.value = finalCount
-            println("🔗 RelayPool: Connected to $finalCount/${relays.size} relays")
-        } finally {
-            // Always release the connection lock
-            isConnecting.set(false)
+        connectionScope.launch {
+            for (message in rawMessageQueue) _incomingMessagesFlow.emit(message)
         }
     }
 
-    suspend fun updateRelays(newRelays: List<String>) {
-        // FIX: Compare content using sorted lists to handle same relays in different order
-        if (newRelays.sorted() == relays.sorted()) {
+    suspend fun connectAll() = connectionMutex.withLock {
+        if (connectedRelayUrls.isNotEmpty()) {
+            println("🔗 RelayPool: Already connected to ${connectedRelayUrls.size} relays")
+            return@withLock
+        }
+        connectAllLocked()
+    }
+
+    private suspend fun connectAllLocked() {
+        if (relays.isEmpty()) {
+            successful.set(0)
+            connectedRelayUrls.clear()
+            _connectedRelaysFlow.value = 0
+            _connectionGenerationFlow.value += 1
             return
         }
-        
-        // Close current connections
-        clients.forEach { it.close() }
-        clients.clear()
-        
-        // Update relay list
-        relays = newRelays
-        
-        // Reset counter but DON'T update flow yet - only update after new connections establish
+
+        closeClients()
         successful.set(0)
-        
-        // Reconnect with new relays using the persistent scope
-        connectAll()
+        connectedRelayUrls.clear()
+        _connectedRelaysFlow.value = 0
+        val targetRelays = relays.toList()
+        val connectionJobs = targetRelays.map { url ->
+            connectionScope.launch {
+                val client = NostrClient(url)
+                clients += client
+                try {
+                    if (client.connect()) {
+                        connectedRelayUrls += url
+                        successful.incrementAndGet()
+                        activeSubscriptions.values.forEach { request ->
+                            if (!client.publishNow(request)) {
+                                println("⚠️ RelayPool: Failed to restore subscription on $url")
+                            }
+                        }
+                        connectionScope.launch {
+                            for (raw in client.incoming) {
+                                relayMessageQueue.trySend(RelayIncomingMessage(url, raw))
+                                rawMessageQueue.trySend(raw)
+                            }
+                        }
+                    } else {
+                        clients.remove(client)
+                        client.close()
+                    }
+                } catch (e: Exception) {
+                    clients.remove(client)
+                    connectedRelayUrls.remove(url)
+                    client.close()
+                    if (e is CancellationException) throw e
+                }
+            }
+        }
+
+        try {
+            withTimeout(15_000) { connectionJobs.joinAll() }
+        } catch (_: TimeoutCancellationException) {
+            connectionJobs.forEach { it.cancel() }
+            connectionJobs.joinAll()
+        }
+
+        val finalCount = connectedRelayUrls.size
+        successful.set(finalCount)
+        _connectedRelaysFlow.value = finalCount
+        _connectionGenerationFlow.value += 1
+        println("🔗 RelayPool: Connected to $finalCount/${targetRelays.size} relays")
+    }
+
+    suspend fun updateRelays(newRelays: List<String>) = connectionMutex.withLock {
+        val distinctRelays = newRelays.distinct()
+        if (distinctRelays.sorted() == relays.sorted()) return@withLock
+        closeClients()
+        relays = distinctRelays
+        successful.set(0)
+        connectedRelayUrls.clear()
+        _connectedRelaysFlow.value = 0
+        connectAllLocked()
+    }
+
+    private fun closeClients() {
+        clients.forEach { client ->
+            client.close()
+            client.incoming.cancel()
+        }
+        clients.clear()
     }
 
     fun broadcast(message: String) {
-        val connectedCount = successful.get()
-        if (connectedCount == 0) {
-            return
-        }
-        
-        clients.forEach { c -> 
-            connectionScope.launch { 
-                try {
-                    // Add a small delay to ensure websocket is truly ready
-                    delay(100)
-                    val success = c.publish(message)
-                    if (!success) {
-                    }
-                } catch (e: Exception) {
+        if (successful.get() == 0) return
+
+        clients.toList()
+            .filter { it.url in connectedRelayUrls }
+            .forEach { client ->
+                if (!client.publishNow(message)) {
+                    println("⚠️ RelayPool: Failed to send message to ${client.url}")
                 }
-            } 
         }
     }
+
+    fun subscribe(subscriptionId: String, request: String) {
+        activeSubscriptions[subscriptionId] = request
+        broadcast(request)
+    }
+
+    fun closeSubscription(subscriptionId: String) {
+        activeSubscriptions.remove(subscriptionId)
+        broadcast("[\"CLOSE\",\"$subscriptionId\"]")
+    }
+
+    fun getConnectedRelayUrls(): Set<String> = connectedRelayUrls.toSet()
 
     /**
      * Broadcast with retry logic - ensures message gets to all connected relays
@@ -208,7 +238,7 @@ class RelayPool(
         // Sort clients by health score (highest first)
         val sortedClients = clients.toList().sortedByDescending { healthScores[it.url] ?: 0.5f }
         
-        for ((index, client) in sortedClients.withIndex()) {
+        for (client in sortedClients) {
             try {
                 // Progressive delay: faster for healthy relays, slower for unhealthy
                 val healthScore = healthScores[client.url] ?: 0.5f

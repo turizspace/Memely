@@ -303,14 +303,14 @@ fun AuthenticatedRoot(
     
     // Only show bottom bar for main tabs, not for meme editor
     val showBottomBar = when (currentRoute) {
-        "home", "media", "explore", "upload", "profile" -> true
+        "home", "friends", "explore", "upload", "profile" -> true
         else -> false
     }
     
     // Get current tab based on route
     val currentTab = when (currentRoute) {
         "home" -> BottomNavScreen.Home
-        "media" -> BottomNavScreen.Media
+        "friends" -> BottomNavScreen.Friends
         "explore" -> BottomNavScreen.Explore
         "upload" -> BottomNavScreen.Upload
         "profile" -> BottomNavScreen.Profile
@@ -398,9 +398,10 @@ fun AuthenticatedRoot(
             composable("explore") {
                 ExploreScreen()
             }
-            composable("media") {
+            composable("friends") {
                 FollowingMediaScreen(
                     pubkey = pubkeyHex,
+                    connectedRelays = connectedRelays,
                     onMediaSelected = { uri ->
                         selectedImageUri = uri
                         navController.navigate("meme_editor")
